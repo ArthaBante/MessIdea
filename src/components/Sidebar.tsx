@@ -1,7 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Compass,
-  Grid,
   Target,
   CalendarCheck,
   Archive,
@@ -9,7 +8,7 @@ import {
   Sun,
   Moon,
   X,
-  User,
+  Users,
   LogOut,
 } from 'lucide-react';
 import { Goal, UserProfile } from '../types';
@@ -17,15 +16,16 @@ import { Goal, UserProfile } from '../types';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  currentView: 'board' | 'matrix' | 'goals' | 'archive' | 'settings';
-  onViewChange: (view: 'board' | 'matrix' | 'goals' | 'archive' | 'settings') => void;
+  currentView: 'board' | 'goals' | 'archive' | 'settings';
+  onViewChange: (view: 'board' | 'goals' | 'archive' | 'settings') => void;
   onOpenWeeklyReview: () => void;
   profile: UserProfile;
   goals: Goal[];
   staleCount: number;
   darkMode: boolean;
   onToggleDarkMode: () => void;
-  onSwitchUser?: () => void;
+  onOpenSwitchUser: () => void;
+  onLogOut: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -39,10 +39,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   staleCount,
   darkMode,
   onToggleDarkMode,
-  onSwitchUser,
+  onOpenSwitchUser,
+  onLogOut,
 }) => {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
   const touchCurrentXRef = useRef<number | null>(null);
+
+  // Close account menu when sidebar closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAccountMenuOpen(false);
+    }
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -80,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const activeGoalsCount = goals.filter((g) => g.status === 'active').length;
 
-  const handleItemClick = (view: 'board' | 'matrix' | 'goals' | 'archive' | 'settings') => {
+  const handleItemClick = (view: 'board' | 'goals' | 'archive' | 'settings') => {
     onViewChange(view);
     onClose();
   };
@@ -94,7 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="fixed inset-0 z-50 flex">
       {/* Dimmed background backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
+        className="fixed inset-0 bg-slate-900/60 dark:bg-black/75 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -110,35 +119,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 dark:bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                IB
-              </div>
+              <img
+                src="/logo.svg"
+                alt="MessIdea"
+                className="w-7 h-7 rounded-lg shadow-xs object-contain"
+              />
               <div>
-                <span className="font-bold text-sm text-slate-900 dark:text-white block">
-                  IdeaBoard
+                <span className="font-bold text-base text-slate-900 dark:text-white block">
+                  MessIdea
                 </span>
-                <span className="text-[10px] text-slate-400 block -mt-0.5">
+                <span className="text-xs text-slate-400 block -mt-0.5">
                   Prioritisation
                 </span>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="Close sidebar"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Navigation Items (Top to bottom: Board, Matrix, Goals, Weekly review, Archive, Settings) */}
-          <nav className="p-3 space-y-1">
+          {/* Navigation Items (Top to bottom: Board, Goals, Weekly review, Archive, Settings) */}
+          <nav className="p-3 space-y-1.5">
             {/* 1. Board */}
             <button
               onClick={() => handleItemClick('board')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-medium transition-all ${
                 currentView === 'board'
-                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -146,25 +157,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Board</span>
             </button>
 
-            {/* 2. Matrix */}
-            <button
-              onClick={() => handleItemClick('matrix')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                currentView === 'matrix'
-                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Grid className="w-4 h-4 shrink-0" />
-              <span>Matrix</span>
-            </button>
-
-            {/* 3. Goals */}
+            {/* 2. Goals */}
             <button
               onClick={() => handleItemClick('goals')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center justify-between px-3.5 py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-medium transition-all ${
                 currentView === 'goals'
-                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -172,33 +170,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Target className="w-4 h-4 shrink-0" />
                 <span>Goals</span>
               </div>
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                 {activeGoalsCount}
               </span>
             </button>
 
-            {/* 4. Weekly Review */}
+            {/* 3. Weekly Review */}
             <button
               onClick={handleWeeklyReviewClick}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white transition-all"
+              className="w-full flex items-center justify-between px-3.5 py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white transition-all"
             >
               <div className="flex items-center gap-3">
                 <CalendarCheck className="w-4 h-4 shrink-0" />
                 <span>Weekly review</span>
               </div>
               {staleCount > 0 && (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">
                   {staleCount} stale
                 </span>
               )}
             </button>
 
-            {/* 5. Archive */}
+            {/* 4. Archive */}
             <button
               onClick={() => handleItemClick('archive')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-medium transition-all ${
                 currentView === 'archive'
-                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -206,12 +204,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Archive</span>
             </button>
 
-            {/* 6. Settings */}
+            {/* 5. Settings */}
             <button
               onClick={() => handleItemClick('settings')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+              className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-medium transition-all ${
                 currentView === 'settings'
-                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -222,11 +220,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bottom Section: User info & Light/Dark Mode Toggle */}
-        <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {/* Light/Dark Mode Toggle */}
           <button
             onClick={onToggleDarkMode}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="w-full flex items-center justify-between px-3.5 py-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <div className="flex items-center gap-2.5">
               {darkMode ? (
@@ -236,36 +234,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
               <span>{darkMode ? 'Light mode' : 'Dark mode'}</span>
             </div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase">
+            <span className="text-xs font-bold text-slate-400 uppercase">
               {darkMode ? 'Dark' : 'Light'}
             </span>
           </button>
 
-          {/* User profile info & switch user */}
-          <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                {profile.displayName ? profile.displayName.charAt(0).toUpperCase() : 'U'}
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-slate-900 dark:text-white truncate text-xs">
-                  {profile.displayName || 'User'}
-                </p>
-                <p className="text-[11px] text-slate-400 truncate">
-                  {profile.email || 'signed in'}
-                </p>
-              </div>
-            </div>
+          {/* User profile info & Account Menu */}
+          <div className="relative">
+            {accountMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 p-1.5 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 z-20 text-xs animate-in fade-in-50 zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    handleItemClick('settings');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 font-medium transition-colors text-left cursor-pointer"
+                >
+                  <Settings className="w-4 h-4 text-slate-500" />
+                  <span>Profile & settings</span>
+                </button>
 
-            {onSwitchUser && (
-              <button
-                onClick={onSwitchUser}
-                title="Switch user / profile"
-                className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-              >
-                <User className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    onClose();
+                    onOpenSwitchUser();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 font-medium transition-colors text-left cursor-pointer"
+                >
+                  <Users className="w-4 h-4 text-blue-500" />
+                  <span>Switch demo user</span>
+                </button>
+
+                <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    onClose();
+                    onLogOut();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium transition-colors text-left cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log out</span>
+                </button>
+              </div>
             )}
+
+            {/* Tapping user row opens menu */}
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((prev) => !prev)}
+              className="w-full p-3 min-h-[48px] rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer text-left focus:outline-none"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  {profile.displayName ? profile.displayName.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 dark:text-white truncate text-xs sm:text-sm">
+                    {profile.displayName || 'User'}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {profile.email || 'signed in'}
+                  </p>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
       </div>

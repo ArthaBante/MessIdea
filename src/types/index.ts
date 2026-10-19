@@ -93,6 +93,7 @@ export interface ScoreSet {
   confidence?: number;
   hoursPerWeekNeeded?: number;
   fieldTag?: FieldTag;
+  goalFits?: Record<string, number>; // goalId -> fit override
 }
 
 export interface Idea {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Bucket,
   FieldTag,
@@ -10,22 +10,26 @@ import {
 } from './types';
 import {
   loadCurrentUserId,
+  saveCurrentUserId,
   loadUserData,
   saveUserData,
   loadScoringConfig,
   saveScoringConfig,
   exportUserDataAsJson,
   importUserDataFromJson,
+  replaceWithSampleData,
+  listSavedDemoUsers,
+  deleteUserData,
+  DemoUserSummary,
   INITIAL_DEMO_IDEAS,
   INITIAL_DEMO_GOALS,
   INITIAL_DEMO_PROFILE,
 } from './services/storage';
-import { calculateIdeaScore, rankAllIdeas } from './shared/scoring';
+import { rankAllIdeas } from './shared/scoring';
 import { scoreIdeaWithAi } from './services/api';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BoardView } from './components/BoardView';
-import { MatrixView } from './components/MatrixView';
 import { GoalsView } from './components/GoalsView';
 import { ArchiveView } from './components/ArchiveView';
 import { SettingsView } from './components/SettingsView';
@@ -33,10 +37,25 @@ import { QuickCaptureModal } from './components/QuickCaptureModal';
 import { IdeaDetailModal } from './components/IdeaDetailModal';
 import { WeeklyReviewModal } from './components/WeeklyReviewModal';
 import { OnboardingModal } from './components/OnboardingModal';
+import { WelcomeScreen } from './components/WelcomeScreen';
+import { SwitchUserModal } from './components/SwitchUserModal';
 import { Plus } from 'lucide-react';
 
 export default function App() {
-  const [userId, setUserId] = useState<string>(() => loadCurrentUserId());
+  const [userId, setUserId] = useState<string>(() => {
+    const saved = loadCurrentUserId();
+    if (saved && saved !== '__logged_out__') {
+      return saved;
+    }
+    return 'demo-user-1';
+  });
+  const [isLoggedOut, setIsLoggedOut] = useState<boolean>(() => {
+    const saved = localStorage.getItem('ideaboard_current_user');
+    return saved === '__logged_out__';
+  });
+  const [switchUserModalOpen, setSwitchUserModalOpen] = useState(false);
+  const [savedUsers, setSavedUsers] = useState<DemoUserSummary[]>([]);
+
   const [profile, setProfile] = useState<UserProfile>(INITIAL_DEMO_PROFILE);
   const [goals, setGoals] = useState<Goal[]>(INITIAL_DEMO_GOALS);
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -44,8 +63,9 @@ export default function App() {
     loadScoringConfig()
   );
 
+  // Views: Matrix removed completely as requested
   const [currentView, setCurrentView] = useState<
-    'board' | 'matrix' | 'goals' | 'archive' | 'settings'
+    'board' | 'goals' | 'archive' | 'settings'
   >('board');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
@@ -60,12 +80,13 @@ export default function App() {
   const [selectedGoalId, setSelectedGoalId] = useState<string | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<IdeaStatus | 'ALL'>('ALL');
 
-  // Dark Mode
+  // Bug fix: On load, follow device theme ONLY if user has never chosen; if they chose light, keep light
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    return (
-      localStorage.getItem('ideaboard_dark_mode') === 'true' ||
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-    );
+    const saved = localStorage.getItem('ideaboard_dark_mode');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   useEffect(() => {
@@ -74,11 +95,28 @@ export default function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('ideaboard_dark_mode', String(darkMode));
   }, [darkMode]);
+
+  const handleToggleDarkMode = () => {
+    setDarkMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('ideaboard_dark_mode', String(next));
+      return next;
+    });
+  };
+
+  // User ID persistence: saveCurrentUserId whenever it changes or on logout
+  useEffect(() => {
+    if (isLoggedOut) {
+      saveCurrentUserId('__logged_out__');
+    } else if (userId && userId !== '__logged_out__') {
+      saveCurrentUserId(userId);
+    }
+  }, [userId, isLoggedOut]);
 
   // Load User Data on mount or when userId changes
   useEffect(() => {
+    if (isLoggedOut || !userId || userId === '__logged_out__') return;
     const store = loadUserData(userId);
     setProfile(store.profile);
     setGoals(store.goals);
@@ -87,12 +125,12 @@ export default function App() {
     if (!store.profile.onboardingDone) {
       setOnboardingOpen(true);
     }
-  }, [userId]);
+  }, [userId, isLoggedOut]);
 
-  // Global Keyboard Shortcuts (N for Quick Capture, Escape for modals/search/sidebar)
+  // Global Keyboard Shortcuts (N for Quick Capture, Escape for modals)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is currently typing in an input or textarea
+      // Ignore if user is typing in an input or textarea
       const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
@@ -112,9 +150,18 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const profileRef = useRef(profile);
+  const goalsRef = useRef(goals);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+  useEffect(() => {
+    goalsRef.current = goals;
+  }, [goals]);
+
   // Helper to re-rank and save data state
   const updateAndPersist = useCallback(
-    (newIdeas: Idea[], newProfile: UserProfile = profile, newGoals: Goal[] = goals) => {
+    (newIdeas: Idea[], newProfile: UserProfile = profileRef.current, newGoals: Goal[] = goalsRef.current) => {
       const activeGoals = newGoals.filter((g) => g.status === 'active');
       const reranked = rankAllIdeas(newIdeas, newProfile, activeGoals, scoringConfig);
       setIdeas(reranked);
@@ -126,10 +173,10 @@ export default function App() {
         ideas: reranked,
       });
     },
-    [userId, profile, goals, scoringConfig]
+    [userId, scoringConfig]
   );
 
-  // Background AI scoring trigger
+  // Background AI scoring trigger: always saves latest profile and goals when done
   const triggerAiScoring = useCallback(
     async (ideaToScore: Idea, currentProfile: UserProfile, currentGoals: Goal[]) => {
       setIdeas((prev) =>
@@ -143,6 +190,11 @@ export default function App() {
         const found = prev.find((i) => i.id === ideaToScore.id);
         if (!found) return prev;
 
+        // Requirement: In triggerAiScoring, save latest profile and goals, not the ones captured when the call started
+        const latestProfile = profileRef.current;
+        const latestGoals = goalsRef.current;
+        const latestActiveGoals = (latestGoals || []).filter((g: Goal) => g.status === 'active');
+
         if (!response.success || !response.data) {
           const withError = {
             ...found,
@@ -152,11 +204,11 @@ export default function App() {
           };
           const reranked = rankAllIdeas(
             prev.map((i) => (i.id === found.id ? withError : i)),
-            currentProfile,
-            activeGoals,
+            latestProfile,
+            latestActiveGoals,
             scoringConfig
           );
-          saveUserData(userId, { profile: currentProfile, goals: currentGoals, ideas: reranked });
+          saveUserData(userId, { profile: latestProfile, goals: latestGoals, ideas: reranked });
           return reranked;
         }
 
@@ -171,10 +223,34 @@ export default function App() {
         const mergedConfidence = userOverrides.confidence ?? data.confidence;
         const mergedHours = userOverrides.hoursPerWeekNeeded ?? data.hoursPerWeekNeeded;
 
+        // Goal fit: AI re-scoring must NOT overwrite user-set goal fits
+        const userGoalFits = userOverrides.goalFits || {};
+        const aiGoalLinks = data.goalLinks || [];
+        const aiGoalFitsRecord: Record<string, number> = {};
+        aiGoalLinks.forEach((gl) => {
+          aiGoalFitsRecord[gl.goalId] = gl.fit;
+        });
+
+        const mergedGoalLinks = (found.goalLinks || []).map((gl) => {
+          const userFit = userGoalFits[gl.goalId];
+          if (userFit != null) {
+            return { ...gl, fit: userFit };
+          }
+          const aiFit = aiGoalFitsRecord[gl.goalId];
+          return aiFit != null ? { ...gl, fit: aiFit } : gl;
+        });
+
+        for (const gl of aiGoalLinks) {
+          if (!mergedGoalLinks.some((m) => m.goalId === gl.goalId)) {
+            const userFit = userGoalFits[gl.goalId];
+            mergedGoalLinks.push({ goalId: gl.goalId, fit: userFit ?? gl.fit });
+          }
+        }
+
         const updatedIdea: Idea = {
           ...found,
           fieldTag: (found.fieldTag === 'Other' && data.fieldTag ? data.fieldTag : found.fieldTag) as FieldTag,
-          goalLinks: data.goalLinks || found.goalLinks,
+          goalLinks: mergedGoalLinks,
           impact: mergedImpact,
           urgency: mergedUrgency,
           skillMatch: mergedSkillMatch,
@@ -192,6 +268,7 @@ export default function App() {
             confidence: data.confidence,
             hoursPerWeekNeeded: data.hoursPerWeekNeeded,
             fieldTag: data.fieldTag as any,
+            goalFits: aiGoalFitsRecord,
           },
           scoresSource: Object.keys(userOverrides).length > 0 ? 'mixed' : 'ai',
           isAiScoring: false,
@@ -202,8 +279,8 @@ export default function App() {
         };
 
         const updatedList = prev.map((i) => (i.id === found.id ? updatedIdea : i));
-        const reranked = rankAllIdeas(updatedList, currentProfile, activeGoals, scoringConfig);
-        saveUserData(userId, { profile: currentProfile, goals: currentGoals, ideas: reranked });
+        const reranked = rankAllIdeas(updatedList, latestProfile, latestActiveGoals, scoringConfig);
+        saveUserData(userId, { profile: latestProfile, goals: latestGoals, ideas: reranked });
         return reranked;
       });
     },
@@ -264,12 +341,46 @@ export default function App() {
     updateAndPersist(nextIdeas, profile, goals);
   };
 
-  // Pin/override bucket
+  // Move / Pin idea to bucket or return to automatic ranking
   const handlePinBucket = (ideaId: string, bucket: Bucket | null) => {
+    const targetIdea = ideas.find((i) => i.id === ideaId);
+    if (!targetIdea) return;
+
+    // Return to automatic ranking
+    if (bucket === null) {
+      const nextIdeas = ideas.map((i) =>
+        i.id === ideaId ? { ...i, pinnedBucket: null, updatedAt: Date.now() } : i
+      );
+      updateAndPersist(nextIdeas, profileRef.current, goalsRef.current);
+      return;
+    }
+
+    // Dropping a card back on its own column does nothing
+    if (targetIdea.bucket === bucket) {
+      return;
+    }
+
+    // Dragging an In-progress idea out of Now also changes its status to "Idea".
+    // Dragging a paused idea out of Parked changes its status back to "Idea".
+    let newStatus: IdeaStatus = targetIdea.status;
+    if (targetIdea.status === 'in_progress' && bucket !== 'now') {
+      newStatus = 'idea';
+    } else if (targetIdea.status === 'paused' && bucket !== 'parked') {
+      newStatus = 'idea';
+    }
+
     const nextIdeas = ideas.map((i) =>
-      i.id === ideaId ? { ...i, pinnedBucket: bucket, updatedAt: Date.now() } : i
+      i.id === ideaId
+        ? {
+            ...i,
+            pinnedBucket: bucket,
+            status: newStatus,
+            lastActivityAt: Date.now(),
+            updatedAt: Date.now(),
+          }
+        : i
     );
-    updateAndPersist(nextIdeas, profile, goals);
+    updateAndPersist(nextIdeas, profileRef.current, goalsRef.current);
   };
 
   // Status change
@@ -327,14 +438,14 @@ export default function App() {
     saveUserData(userId, { profile, goals, ideas: reranked });
   };
 
-  // Data management
+  // Data management: Export filename renamed to messidea-backup-DATE.json
   const handleExportJson = () => {
     const jsonStr = exportUserDataAsJson(userId);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ideaboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `messidea-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -347,16 +458,90 @@ export default function App() {
   };
 
   const handleResetData = () => {
-    const ranked = rankAllIdeas(INITIAL_DEMO_IDEAS, INITIAL_DEMO_PROFILE, INITIAL_DEMO_GOALS, scoringConfig);
-    const store = {
-      profile: { ...INITIAL_DEMO_PROFILE, uid: userId },
-      goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId })),
-      ideas: ranked.map((i) => ({ ...i, userId })),
-    };
-    saveUserData(userId, store);
+    const store = replaceWithSampleData(userId);
     setProfile(store.profile);
     setGoals(store.goals);
     setIdeas(store.ideas);
+    setSelectedIdeaId(null);
+  };
+
+  // Demo user management
+  const handleStartWithUser = (displayName: string) => {
+    const newUid = `user-${Date.now()}`;
+    const newProfile: UserProfile = {
+      uid: newUid,
+      displayName: displayName.trim(),
+      email: `${displayName.toLowerCase().replace(/\s+/g, '')}@example.com`,
+      aboutMe: '',
+      situation: 'employed_full',
+      skills: [],
+      hoursPerWeek: 10,
+      riskAppetite: 'medium',
+      onboardingDone: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    // Section G.4: A new user gets no goals and no ideas; onboarding creates their goals. Never copy the demo goals.
+    saveUserData(newUid, {
+      profile: newProfile,
+      goals: [],
+      ideas: [],
+      version: 2,
+    });
+    setUserId(newUid);
+    saveCurrentUserId(newUid);
+    setProfile(newProfile);
+    setGoals([]);
+    setIdeas([]);
+    setSelectedIdeaId(null);
+    setIsLoggedOut(false);
+    setOnboardingOpen(true);
+  };
+
+  const handleTrySampleData = () => {
+    setUserId('demo-user-1');
+    saveCurrentUserId('demo-user-1');
+    setIsLoggedOut(false);
+    const store = loadUserData('demo-user-1');
+    setProfile(store.profile);
+    setGoals(store.goals);
+    setIdeas(store.ideas);
+    setSelectedIdeaId(null);
+    setOnboardingOpen(false);
+  };
+
+  const handleLogOut = () => {
+    setIsLoggedOut(true);
+    saveCurrentUserId('__logged_out__');
+    setSidebarOpen(false);
+    setSelectedIdeaId(null);
+  };
+
+  const handleSelectDemoUser = (targetUid: string) => {
+    setUserId(targetUid);
+    saveCurrentUserId(targetUid);
+    setIsLoggedOut(false);
+    const store = loadUserData(targetUid);
+    setProfile(store.profile);
+    setGoals(store.goals);
+    setIdeas(store.ideas);
+    setSelectedIdeaId(null);
+    if (!store.profile.onboardingDone) {
+      setOnboardingOpen(true);
+    }
+  };
+
+  const handleDeleteDemoUser = (targetUid: string) => {
+    deleteUserData(targetUid);
+    const remaining = listSavedDemoUsers();
+    setSavedUsers(remaining);
+    if (userId === targetUid) {
+      if (remaining.length > 0) {
+        handleSelectDemoUser(remaining[0].uid);
+      } else {
+        handleLogOut();
+      }
+    }
   };
 
   // Onboarding completion
@@ -415,11 +600,25 @@ export default function App() {
     return ideas.find((i) => i.id === selectedIdeaId) || null;
   }, [ideas, selectedIdeaId]);
 
+  // Section G.2: If logged out, show simple welcome screen
+  if (isLoggedOut) {
+    return (
+      <WelcomeScreen
+        onStartWithUser={handleStartWithUser}
+        onTrySampleData={handleTrySampleData}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
-      {/* Redesigned Minimal Header: Hamburger far left, IdeaBoard + Search in center, nothing else */}
+    <div className="min-h-dvh bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors overflow-x-hidden">
+      {/* Header: Menu on far left, logo/name in centre, search on far right */}
       <Header
         onOpenSidebar={() => setSidebarOpen(true)}
+        onGoToBoard={() => {
+          setCurrentView('board');
+          handleCloseSearch();
+        }}
         isSearchOpen={isSearchOpen}
         onToggleSearch={() => {
           if (isSearchOpen) {
@@ -440,7 +639,7 @@ export default function App() {
         onStatusChange={setSelectedStatus}
       />
 
-      {/* Slide-in Overlay Sidebar (like Claude mobile app) */}
+      {/* Slide-in Overlay Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -451,35 +650,17 @@ export default function App() {
         goals={goals}
         staleCount={staleCount}
         darkMode={darkMode}
-        onToggleDarkMode={() => setDarkMode(!darkMode)}
-        onSwitchUser={() => {
+        onToggleDarkMode={handleToggleDarkMode}
+        onOpenSwitchUser={() => {
           setSidebarOpen(false);
-          const newName = prompt('Enter a profile name or email for this session:', profile.displayName);
-          if (newName && newName.trim()) {
-            const newUid = `user-${Date.now()}`;
-            setUserId(newUid);
-            const newProfile: UserProfile = {
-              ...INITIAL_DEMO_PROFILE,
-              uid: newUid,
-              displayName: newName.trim(),
-              email: `${newName.toLowerCase().replace(/\s+/g, '')}@example.com`,
-              onboardingDone: false,
-            };
-            saveUserData(newUid, {
-              profile: newProfile,
-              goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: newUid })),
-              ideas: [],
-            });
-            setProfile(newProfile);
-            setGoals(INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: newUid })));
-            setIdeas([]);
-            setOnboardingOpen(true);
-          }
+          setSavedUsers(listSavedDemoUsers());
+          setSwitchUserModalOpen(true);
         }}
+        onLogOut={handleLogOut}
       />
 
       {/* Main Views */}
-      <main className="flex-1 pb-20">
+      <main className="flex-1 pb-24 md:pb-12">
         {currentView === 'board' && (
           <BoardView
             ideas={filteredIdeas}
@@ -489,15 +670,7 @@ export default function App() {
             onPinBucket={handlePinBucket}
             onStatusChange={handleStatusChange}
             onRetryAiScoring={(idea) => triggerAiScoring(idea, profile, goals)}
-            onOpenQuickCapture={() => setQuickCaptureOpen(true)}
-          />
-        )}
-
-        {currentView === 'matrix' && (
-          <MatrixView
-            ideas={filteredIdeas}
-            goals={goals}
-            onSelectIdea={(idea) => setSelectedIdeaId(idea.id)}
+            onDeleteIdea={handleDeleteIdea}
             onOpenQuickCapture={() => setQuickCaptureOpen(true)}
           />
         )}
@@ -534,12 +707,12 @@ export default function App() {
         )}
       </main>
 
-      {/* Item 4: Floating "+" round button fixed to bottom-right corner on EVERY page */}
+      {/* Floating "+" round button fixed above bottom safe area on EVERY page */}
       <button
         onClick={() => setQuickCaptureOpen(true)}
         title="Add Idea (Shortcut: N)"
         aria-label="Add Idea"
-        className="fixed bottom-6 right-6 z-40 flex items-center justify-center w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+        className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+1rem))] right-4 sm:right-6 z-40 flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
       >
         <Plus className="w-6 h-6 stroke-[2.5]" />
       </button>
@@ -580,6 +753,22 @@ export default function App() {
         onComplete={handleOnboardingComplete}
         initialProfile={profile}
         initialGoals={goals}
+      />
+
+      <SwitchUserModal
+        isOpen={switchUserModalOpen}
+        onClose={() => setSwitchUserModalOpen(false)}
+        users={savedUsers}
+        currentUserId={userId}
+        onSelectUser={handleSelectDemoUser}
+        onNewUser={() => {
+          setSwitchUserModalOpen(false);
+          handleLogOut();
+        }}
+        onNewUserWithName={(name) => {
+          handleStartWithUser(name);
+        }}
+        onDeleteUser={handleDeleteDemoUser}
       />
     </div>
   );

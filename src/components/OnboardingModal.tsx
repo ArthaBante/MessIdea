@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UserProfile,
   Goal,
   Situation,
-  RiskAppetite,
   Horizon,
 } from '../types';
 import {
@@ -12,12 +11,11 @@ import {
   CheckCircle,
   Plus,
   Trash2,
-  Sparkles,
   Target,
   Clock,
-  Shield,
   Briefcase,
   X,
+  AlertCircle,
 } from 'lucide-react';
 
 interface OnboardingModalProps {
@@ -45,9 +43,6 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [hoursPerWeek, setHoursPerWeek] = useState(
     initialProfile.hoursPerWeek || 8
   );
-  const [riskAppetite, setRiskAppetite] = useState<RiskAppetite>(
-    initialProfile.riskAppetite || 'medium'
-  );
 
   const [goalsList, setGoalsList] = useState<
     Array<{
@@ -57,33 +52,51 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       importance: number;
       description?: string;
     }>
-  >(
-    initialGoals.length > 0
-      ? initialGoals.map((g) => ({
-          id: g.id,
-          title: g.title,
-          horizon: g.horizon,
-          importance: g.importance,
-          description: g.description,
-        }))
-      : [
+  >([]);
+
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [newGoalHorizon, setNewGoalHorizon] = useState<Horizon>('3m');
+  const [newGoalImportance, setNewGoalImportance] = useState(5);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Bug fix: The onboarding form must load the current profile and goals every time it opens
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setErrorMessage(null);
+      setAboutMe(initialProfile.aboutMe || '');
+      setSituation(initialProfile.situation || 'employed_full');
+      setSkills(initialProfile.skills?.length ? [...initialProfile.skills] : ['TypeScript', 'Design']);
+      setHoursPerWeek(initialProfile.hoursPerWeek || 8);
+
+      const active = initialGoals.filter((g) => g.status === 'active');
+      if (active.length > 0) {
+        setGoalsList(
+          active.map((g) => ({
+            id: g.id,
+            title: g.title,
+            horizon: g.horizon,
+            importance: g.importance,
+            description: g.description,
+          }))
+        );
+      } else {
+        setGoalsList([
           {
-            id: 'g-1',
+            id: `g-${Date.now()}`,
             title: 'Land a software developer job',
             horizon: '3m',
             importance: 5,
             description: 'Transition into engineering within 6 months',
           },
-        ]
-  );
-
-  const [newGoalTitle, setNewGoalTitle] = useState('');
-  const [newGoalHorizon, setNewGoalHorizon] = useState<Horizon>('3m');
-  const [newGoalImportance, setNewGoalImportance] = useState(5);
+        ]);
+      }
+    }
+  }, [isOpen, initialProfile, initialGoals]);
 
   if (!isOpen) return null;
 
-  const totalSteps = 6;
+  const totalSteps = 5; // Risk appetite removed: Onboarding is now 5 steps
 
   const handleAddSkill = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && skillInput.trim()) {
@@ -117,7 +130,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const handleRemoveGoal = (id: string) => {
     if (goalsList.length <= 1) {
-      alert('You must have at least one active goal for IdeaBoard to prioritize.');
+      setErrorMessage('You must have at least one active goal for MessIdea to prioritize.');
+      setTimeout(() => setErrorMessage(null), 4000);
       return;
     }
     setGoalsList(goalsList.filter((g) => g.id !== id));
@@ -125,7 +139,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const handleFinish = () => {
     if (goalsList.length === 0) {
-      alert('Please define at least one goal to complete onboarding.');
+      setErrorMessage('Please define at least one goal to complete onboarding.');
+      setTimeout(() => setErrorMessage(null), 4000);
       return;
     }
 
@@ -135,37 +150,44 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       situation,
       skills,
       hoursPerWeek,
-      riskAppetite,
       onboardingDone: true,
       updatedAt: Date.now(),
     };
 
-    const updatedGoals: Goal[] = goalsList.map((g) => ({
-      id: g.id,
-      userId: initialProfile.uid,
-      title: g.title,
-      description: g.description || '',
-      horizon: g.horizon,
-      importance: g.importance,
-      status: 'active',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }));
+    // Bug fix: keep existing goal createdAt, and keep goals that are achieved or dropped
+    const existingGoalMap = new Map(initialGoals.map((g) => [g.id, g]));
+    const nonActiveGoals = initialGoals.filter((g) => g.status !== 'active');
 
-    onComplete(updatedProfile, updatedGoals);
+    const updatedActiveGoals: Goal[] = goalsList.map((g) => {
+      const existing = existingGoalMap.get(g.id);
+      return {
+        id: g.id,
+        userId: initialProfile.uid,
+        title: g.title,
+        description: g.description || existing?.description || '',
+        horizon: g.horizon,
+        importance: g.importance,
+        status: 'active',
+        createdAt: existing?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      };
+    });
+
+    const allGoals = [...updatedActiveGoals, ...nonActiveGoals];
+    onComplete(updatedProfile, allGoals);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-xl bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+      <div className="w-full max-w-xl bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[92dvh]">
         {/* Top Header & Progress */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/80">
+        <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/80 shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
               Step {step} of {totalSteps}
             </span>
             <span className="text-xs text-slate-400 font-medium">
-              ~3 minutes setup
+              ~2 minutes setup
             </span>
           </div>
 
@@ -179,7 +201,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         </div>
 
         {/* Question Step Container */}
-        <div className="p-6 sm:p-8 flex-1 overflow-y-auto">
+        <div className="p-5 sm:p-8 flex-1 overflow-y-auto">
           {/* STEP 1: About you */}
           {step === 1 && (
             <div className="space-y-4">
@@ -197,7 +219,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 value={aboutMe}
                 onChange={(e) => setAboutMe(e.target.value)}
                 placeholder="e.g. I am a frontend developer learning backend architecture. I love building practical web tools and SaaS prototypes, and want to build a career in software engineering..."
-                className="w-full px-4 py-3 text-xs sm:text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full px-4 py-3 text-xs sm:text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[100px]"
               />
             </div>
           )}
@@ -226,17 +248,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => setSituation(item.id as Situation)}
-                    className={`flex items-start text-left p-3.5 rounded-xl border transition-all ${
+                    className={`flex items-start text-left p-3.5 min-h-[50px] rounded-xl border transition-all ${
                       situation === item.id
                         ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100 ring-1 ring-blue-500'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex-1">
-                      <div className="font-semibold text-xs text-slate-900 dark:text-white">
+                      <div className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white">
                         {item.label}
                       </div>
-                      <div className="text-[11px] text-slate-500">{item.desc}</div>
+                      <div className="text-xs text-slate-500">{item.desc}</div>
                     </div>
                     {situation === item.id && (
                       <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
@@ -264,15 +286,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   {skills.map((skill) => (
                     <span
                       key={skill}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
                     >
                       {skill}
                       <button
                         type="button"
                         onClick={() => handleRemoveSkill(skill)}
-                        className="text-blue-500 hover:text-blue-700"
+                        className="text-blue-500 hover:text-blue-700 p-0.5"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </span>
                   ))}
@@ -282,10 +304,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     value={skillInput}
                     onChange={(e) => setSkillInput(e.target.value)}
                     onKeyDown={handleAddSkill}
-                    className="flex-1 min-w-[200px] bg-transparent text-xs text-slate-900 dark:text-white focus:outline-none p-1"
+                    className="flex-1 min-w-[180px] bg-transparent text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none p-1.5"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-slate-400">
                   Tip: Press Enter to add tags. You can add more later in Profile.
                 </p>
               </div>
@@ -306,7 +328,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 text-center space-y-4">
                 <div className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
-                  {hoursPerWeek} <span className="text-base font-normal text-slate-500">hours / week</span>
+                  {hoursPerWeek} <span className="text-sm font-normal text-slate-500">hours / week</span>
                 </div>
 
                 <input
@@ -316,7 +338,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   step={1}
                   value={hoursPerWeek}
                   onChange={(e) => setHoursPerWeek(Number(e.target.value))}
-                  className="w-full accent-blue-600 cursor-pointer"
+                  className="w-full accent-blue-600 cursor-pointer min-h-[36px]"
                 />
 
                 <p className="text-xs text-slate-500">
@@ -330,63 +352,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             </div>
           )}
 
-          {/* STEP 5: Risk Appetite */}
+          {/* STEP 5: Goals (1 to 5 goals) - Final Step */}
           {step === 5 && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  What is your risk appetite?
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Controls how heavily vague or uncertain ideas are penalised by the formula.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                {[
-                  {
-                    id: 'low',
-                    label: 'Low Risk Appetite (Cautious)',
-                    desc: 'Penalises uncertainty heavily (r = 0.40). Vague ideas sink straight to Parked until validated.',
-                  },
-                  {
-                    id: 'medium',
-                    label: 'Medium Risk Appetite (Balanced)',
-                    desc: 'Standard calibration (r = 0.30). Weighs confidence reasonably without shutting down exploration.',
-                  },
-                  {
-                    id: 'high',
-                    label: 'High Risk Appetite (Bold)',
-                    desc: 'Minimal uncertainty penalty (r = 0.15). Willing to bet on high-payoff ideas even with early ambiguity.',
-                  },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setRiskAppetite(item.id as RiskAppetite)}
-                    className={`flex items-start text-left p-4 rounded-xl border transition-all ${
-                      riskAppetite === item.id
-                        ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100 ring-1 ring-blue-500'
-                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex-1">
-                      <div className="font-semibold text-xs text-slate-900 dark:text-white">
-                        {item.label}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">{item.desc}</div>
-                    </div>
-                    {riskAppetite === item.id && (
-                      <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 6: Goals (1 to 5 goals) */}
-          {step === 6 && (
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -402,22 +369,23 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 {goalsList.map((g, idx) => (
                   <div
                     key={g.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs"
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs"
                   >
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-white">
+                      <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                         {idx + 1}. {g.title}
                       </div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-xs text-slate-500 mt-0.5">
                         Horizon: {g.horizon} • Importance: {g.importance}★
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveGoal(g.id)}
-                      className="text-slate-400 hover:text-rose-500 p-1"
+                      className="text-slate-400 hover:text-rose-500 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      title="Remove goal"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 ))}
@@ -425,7 +393,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               {/* Add Goal Subform */}
               {goalsList.length < 5 && (
-                <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 space-y-2">
+                <div className="p-3.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 space-y-2.5">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Add another goal ({goalsList.length}/5)
                   </span>
@@ -434,13 +402,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     placeholder="e.g. Build a $1,000/mo side income"
                     value={newGoalTitle}
                     onChange={(e) => setNewGoalTitle(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <select
                       value={newGoalHorizon}
                       onChange={(e) => setNewGoalHorizon(e.target.value as Horizon)}
-                      className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                     >
                       <option value="3m">3 Months</option>
                       <option value="1y">1 Year</option>
@@ -450,7 +418,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     <select
                       value={newGoalImportance}
                       onChange={(e) => setNewGoalImportance(Number(e.target.value))}
-                      className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                     >
                       <option value={5}>5★ Critical</option>
                       <option value={4}>4★ High</option>
@@ -462,8 +430,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                       type="button"
                       onClick={handleAddGoal}
                       disabled={!newGoalTitle.trim()}
-                      className="ml-auto px-3 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white disabled:opacity-50"
+                      className="ml-auto px-4 py-2 min-h-[44px] text-xs font-semibold rounded-lg bg-blue-600 text-white disabled:opacity-50 flex items-center gap-1"
                     >
+                      <Plus className="w-3.5 h-3.5" />
                       Add Goal
                     </button>
                   </div>
@@ -473,15 +442,22 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           )}
         </div>
 
+        {errorMessage && (
+          <div className="mx-6 mb-3 p-3 text-xs font-semibold text-rose-700 bg-rose-50 dark:bg-rose-950/60 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-900/60 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {/* Footer Navigation */}
-        <div className="p-5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {step > 1 ? (
             <button
               type="button"
               onClick={() => setStep(step - 1)}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Back
+              <ArrowLeft className="w-4 h-4" /> Back
             </button>
           ) : (
             <div />
@@ -491,15 +467,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <button
               type="button"
               onClick={() => setStep(step + 1)}
-              className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition-colors"
+              className="flex items-center gap-1.5 px-6 py-2.5 min-h-[44px] text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition-colors"
             >
-              Continue <ArrowRight className="w-3.5 h-3.5" />
+              Continue <ArrowRight className="w-4 h-4" />
             </button>
           ) : (
             <button
               type="button"
               onClick={handleFinish}
-              className="flex items-center gap-1.5 px-6 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02]"
+              className="flex items-center gap-1.5 px-6 py-2.5 min-h-[44px] text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02]"
             >
               <CheckCircle className="w-4 h-4" />
               Finish Setup & Launch Board

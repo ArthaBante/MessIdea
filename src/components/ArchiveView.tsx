@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Archive, CheckCircle, RotateCcw, Trash2, Tag, Calendar } from 'lucide-react';
 import { Idea } from '../types';
 import { getFieldTagColor } from '../utils/colors';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ArchiveViewProps {
   ideas: Idea[];
@@ -17,6 +18,7 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
   onSelectIdea,
 }) => {
   const [filter, setFilter] = useState<'all' | 'done' | 'dropped'>('all');
+  const [ideaToDelete, setIdeaToDelete] = useState<string | null>(null);
 
   const archivedIdeas = ideas.filter(
     (i) => i.status === 'done' || i.status === 'dropped'
@@ -87,7 +89,7 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
           <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
             No archived ideas in this category
           </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             When you complete or drop an idea, it will appear here.
           </p>
         </div>
@@ -104,9 +106,9 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
                   className="flex-1 cursor-pointer"
                   onClick={() => onSelectIdea(idea)}
                 >
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
                         idea.status === 'done'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                           : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
@@ -115,11 +117,11 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
                       {idea.status}
                     </span>
                     <span
-                      className={`px-2 py-0.5 text-[10px] font-semibold rounded ${tagColor.bg} ${tagColor.text}`}
+                      className={`px-2 py-0.5 text-xs font-semibold rounded ${tagColor.bg} ${tagColor.text}`}
                     >
                       {idea.fieldTag}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       Score was: {idea.priorityScore}
                     </span>
                   </div>
@@ -136,20 +138,18 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                   <button
                     onClick={() => onRestoreIdea(idea.id)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-4 h-4" />
                     Restore to Board
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm('Delete this archived idea permanently?')) {
-                        onDeleteIdea(idea.id);
-                      }
-                    }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
+                    type="button"
+                    onClick={() => setIdeaToDelete(idea.id)}
+                    className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                    aria-label="Delete archived idea"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -157,6 +157,23 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
           })}
         </div>
       )}
+
+      {/* In-app delete confirmation dialog */}
+      <ConfirmModal
+        isOpen={ideaToDelete !== null}
+        title="Delete this idea?"
+        message="Clearing space is part of the process. Every idea teaches you something."
+        confirmLabel="Delete"
+        cancelLabel="Keep it"
+        isDestructive={true}
+        onConfirm={() => {
+          if (ideaToDelete) {
+            onDeleteIdea(ideaToDelete);
+            setIdeaToDelete(null);
+          }
+        }}
+        onCancel={() => setIdeaToDelete(null)}
+      />
     </div>
   );
 };

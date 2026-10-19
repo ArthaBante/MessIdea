@@ -89,7 +89,8 @@ export function calculateIdeaScore(
 
   // Step 4: Priority
   // Priority = round(100 * Value * (1 - 0.35 * n(Effort)) * (1 - r * (1 - n(Confidence))))
-  const r = config.riskFactors[profile.riskAppetite] ?? 0.30;
+  // Fixed r = 0.30 (risk appetite removed; fixed uncertainty penalty factor)
+  const r = 0.30;
   const effortPenalty = 1 - config.effortPenaltyWeight * nEffort;
   const confidenceFactor = 1 - r * (1 - nConfidence);
 
@@ -139,21 +140,9 @@ export function assignBuckets(
   let nowCount = 0;
   let nowHoursSum = 0;
 
-  // 1. Process explicit In-Progress first (guaranteed Now)
-  const inProgressIdeas = activeIdeas.filter(
-    (idea) => idea.status === 'in_progress'
-  );
-  for (const idea of inProgressIdeas) {
-    bucketMap.set(idea.id, 'now');
-    nowCount++;
-    nowHoursSum += idea.hoursPerWeekNeeded || 0;
-  }
-
-  // 2. Process pinned ideas
-  const pinnedNonInProgress = activeIdeas.filter(
-    (idea) => idea.status !== 'in_progress' && idea.pinnedBucket !== null
-  );
-  for (const idea of pinnedNonInProgress) {
+  // 1. Process hand-placed / pinned ideas first (wins over every rule except Done/Dropped, including in_progress)
+  const pinnedIdeas = activeIdeas.filter((idea) => idea.pinnedBucket != null);
+  for (const idea of pinnedIdeas) {
     const bucket = idea.pinnedBucket!;
     bucketMap.set(idea.id, bucket);
     if (bucket === 'now') {
@@ -162,9 +151,27 @@ export function assignBuckets(
     }
   }
 
-  // 3. Process remaining unpinned ideas
+  // 2. Process paused ideas that are not pinned elsewhere -> automatically Parked
+  const pausedUnpinned = activeIdeas.filter(
+    (idea) => idea.pinnedBucket == null && idea.status === 'paused'
+  );
+  for (const idea of pausedUnpinned) {
+    bucketMap.set(idea.id, 'parked');
+  }
+
+  // 3. Process explicit In-Progress that are not pinned elsewhere (guaranteed Now)
+  const inProgressUnpinned = activeIdeas.filter(
+    (idea) => idea.pinnedBucket == null && idea.status === 'in_progress'
+  );
+  for (const idea of inProgressUnpinned) {
+    bucketMap.set(idea.id, 'now');
+    nowCount++;
+    nowHoursSum += idea.hoursPerWeekNeeded || 0;
+  }
+
+  // 4. Process remaining unpinned active ideas (not in_progress, not paused)
   const unpinned = activeIdeas.filter(
-    (idea) => idea.status !== 'in_progress' && idea.pinnedBucket === null
+    (idea) => idea.pinnedBucket == null && idea.status !== 'in_progress' && idea.status !== 'paused'
   );
 
   // Separate low goal fit (< cutoff) -> directly Parked
@@ -194,12 +201,11 @@ export function assignBuckets(
     return a.createdAt - b.createdAt;
   });
 
-  // Evaluate candidates
+  // Evaluate candidates: No 3-idea limit (maxNowCount removed). Only weekly hours limit stays.
   for (const idea of candidates) {
     const ideaHours = idea.hoursPerWeekNeeded || 0;
     const canFitInNow =
       idea.priorityScore >= config.thresholds.nowScoreMin &&
-      nowCount < config.thresholds.maxNowCount &&
       nowHoursSum + ideaHours <= profile.hoursPerWeek;
 
     if (canFitInNow) {

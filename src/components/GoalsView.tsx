@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Goal, Horizon, GoalStatus } from '../types';
 import { Target, Plus, CheckCircle, Trash2, Calendar, Star, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 
 interface GoalsViewProps {
   goals: Goal[];
@@ -16,6 +17,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
   onDeleteGoal,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newHorizon, setNewHorizon] = useState<Horizon>('3m');
@@ -94,14 +96,14 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
             <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
               No active goals configured
             </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Every idea needs at least one target to be ranked properly.
             </p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white inline-flex items-center gap-1"
+              className="mt-3 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" /> Create Goal
+              <Plus className="w-4 h-4" /> Create Goal
             </button>
           </div>
         ) : (
@@ -113,7 +115,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200/50 dark:border-blue-900">
+                    <span className="px-2 py-0.5 text-xs font-bold uppercase tracking-wide rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200/50 dark:border-blue-900">
                       {goal.horizon}
                     </span>
                     <div className="flex items-center gap-1 text-amber-500">
@@ -141,7 +143,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
                 <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs">
                   {/* Importance Quick Slider */}
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-500">Importance:</span>
+                    <span className="text-xs text-slate-500">Importance:</span>
                     <select
                       value={goal.importance}
                       onChange={(e) =>
@@ -151,7 +153,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
                           updatedAt: Date.now(),
                         })
                       }
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-slate-50 dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700"
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-slate-50 dark:bg-slate-900 px-2.5 py-1.5 min-h-[44px] rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none"
                     >
                       <option value={1}>1 (Low)</option>
                       <option value={2}>2</option>
@@ -172,20 +174,19 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
                         })
                       }
                       title="Mark Goal Achieved"
-                      className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                      className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                      aria-label="Mark Goal Achieved"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm('Delete this goal?')) {
-                          onDeleteGoal(goal.id);
-                        }
-                      }}
+                      type="button"
+                      onClick={() => setGoalToDelete(goal.id)}
                       title="Delete Goal"
-                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 transition-colors"
+                      className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      aria-label="Delete Goal"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
@@ -212,7 +213,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
                     {g.title}
                   </span>
-                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                  <span className="text-xs uppercase font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
                     {g.status}
                   </span>
                 </div>
@@ -224,7 +225,7 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
                       updatedAt: Date.now(),
                     })
                   }
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="min-h-[44px] px-3 py-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center"
                 >
                   Reactivate
                 </button>
@@ -323,6 +324,23 @@ export const GoalsView: React.FC<GoalsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* In-app delete goal confirmation dialog */}
+      <ConfirmModal
+        isOpen={goalToDelete !== null}
+        title="Delete this goal?"
+        message="Ideas linked to it will be re-ranked."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        onConfirm={() => {
+          if (goalToDelete) {
+            onDeleteGoal(goalToDelete);
+            setGoalToDelete(null);
+          }
+        }}
+        onCancel={() => setGoalToDelete(null)}
+      />
     </div>
   );
 };

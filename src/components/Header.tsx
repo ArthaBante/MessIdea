@@ -4,6 +4,7 @@ import { FieldTag, Goal, IdeaStatus } from '../types';
 
 interface HeaderProps {
   onOpenSidebar: () => void;
+  onGoToBoard: () => void;
   isSearchOpen: boolean;
   onToggleSearch: () => void;
   onCloseSearch: () => void;
@@ -20,6 +21,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenSidebar,
+  onGoToBoard,
   isSearchOpen,
   onToggleSearch,
   onCloseSearch,
@@ -70,41 +72,57 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Main Minimal Header: Hamburger on far left, IdeaBoard + Search in center, nothing else */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-6">
+        {/* Section F: Menu icon at far left; MessIdea logo & name in centre; search icon at far right */}
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Far Left: Menu Icon */}
           <div className="flex items-center">
             <button
+              type="button"
               onClick={onOpenSidebar}
-              className="p-2 -ml-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all focus:outline-none"
-              aria-label="Open menu"
+              className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition-all focus:outline-none cursor-pointer"
+              aria-label="Open navigation menu"
             >
               <Menu className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Center: App name "IdeaBoard" with small search icon right next to it */}
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white select-none">
-              IdeaBoard
+          {/* Centre: MessIdea logo and name (goes to Board and closes search; never toggles search) */}
+          <button
+            type="button"
+            onClick={() => {
+              onGoToBoard();
+              onCloseSearch();
+            }}
+            className="flex items-center gap-2 cursor-pointer select-none focus:outline-none hover:opacity-85 transition-opacity"
+            title="Go to Board"
+          >
+            <img
+              src="/logo.svg"
+              alt="MessIdea"
+              className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0 rounded"
+            />
+            <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
+              MessIdea
             </span>
+          </button>
+
+          {/* Far Right: Search Icon (same size and spacing as menu icon) */}
+          <div className="flex items-center">
             <button
+              type="button"
               onClick={onToggleSearch}
-              className={`p-1.5 rounded-lg transition-colors focus:outline-none ${
+              className={`p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all focus:outline-none cursor-pointer ${
                 isSearchOpen
                   ? 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                  : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
               title="Search ideas"
               aria-label="Search ideas"
             >
-              <Search className="w-4 h-4" />
+              <Search className="w-5 h-5" />
             </button>
           </div>
-
-          {/* Far Right: Invisible spacer to keep center content optically centered */}
-          <div className="w-9" aria-hidden="true" />
         </div>
 
         {/* Search bar directly below the header */}
@@ -119,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
                   placeholder="Search ideas, descriptions & notes..."
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full pl-9 pr-11 py-2.5 min-h-[44px] text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
 
                 {/* Filter icon inside search bar */}
@@ -127,16 +145,16 @@ export const Header: React.FC<HeaderProps> = ({
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
                   title={showFilters ? 'Hide filters' : 'Show filters'}
-                  className={`absolute right-2.5 p-1 rounded-md transition-colors ${
+                  className={`absolute right-1 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
                     showFilters || hasActiveFilters
                       ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70'
                       : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                   }`}
                   aria-label="Toggle filters"
                 >
-                  <Filter className="w-3.5 h-3.5" />
+                  <Filter className="w-4 h-4" />
                   {hasActiveFilters && (
-                    <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-blue-600" />
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-600" />
                   )}
                 </button>
               </div>
@@ -145,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onCloseSearch}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 title="Close search (Esc)"
                 aria-label="Close search"
               >
@@ -155,16 +173,16 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Filter row shown ONLY when filter icon inside search bar is tapped */}
             {showFilters && (
-              <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs animate-in fade-in slide-in-from-top-1">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs animate-in fade-in slide-in-from-top-1">
                 {/* Field Tag Filter */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                     Field
                   </label>
                   <select
                     value={selectedTag}
                     onChange={(e) => onTagChange(e.target.value as any)}
-                    className="w-full py-1.5 px-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full py-2 px-2.5 min-h-[44px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="ALL">All Fields</option>
                     <option value="Tech">Tech</option>
@@ -180,13 +198,13 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Goal Filter */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                     Goal
                   </label>
                   <select
                     value={selectedGoalId}
                     onChange={(e) => onGoalChange(e.target.value)}
-                    className="w-full py-1.5 px-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 truncate"
+                    className="w-full py-2 px-2.5 min-h-[44px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 truncate"
                   >
                     <option value="ALL">All Goals</option>
                     {goals.map((g) => (
@@ -200,13 +218,13 @@ export const Header: React.FC<HeaderProps> = ({
                 {/* Status Filter */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Status
                     </label>
                     {hasActiveFilters && (
                       <button
                         onClick={clearAllFilters}
-                        className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                        className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 p-1"
                       >
                         Reset
                       </button>
@@ -215,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <select
                     value={selectedStatus}
                     onChange={(e) => onStatusChange(e.target.value as any)}
-                    className="w-full py-1.5 px-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full py-2 px-2.5 min-h-[44px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="ALL">All Statuses</option>
                     <option value="idea">Idea</option>

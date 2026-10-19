@@ -263,6 +263,7 @@ export interface UserDataStore {
   profile: UserProfile;
   goals: Goal[];
   ideas: Idea[];
+  version?: number;
 }
 
 export function loadCurrentUserId(): string {
@@ -289,28 +290,134 @@ export function saveScoringConfig(config: ScoringConfig): void {
   localStorage.setItem(STORAGE_KEYS.SCORING_CONFIG, JSON.stringify(config));
 }
 
+export interface DemoUserSummary {
+  uid: string;
+  displayName: string;
+  email: string;
+  ideaCount: number;
+}
+
+export function listSavedDemoUsers(): DemoUserSummary[] {
+  const users: DemoUserSummary[] = [];
+  const foundUids = new Set<string>();
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(STORAGE_KEYS.USERS_PREFIX)) {
+      const uid = key.slice(STORAGE_KEYS.USERS_PREFIX.length);
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          users.push({
+            uid,
+            displayName: parsed.profile?.displayName || 'Demo User',
+            email: parsed.profile?.email || '',
+            ideaCount: Array.isArray(parsed.ideas) ? parsed.ideas.length : 0,
+          });
+          foundUids.add(uid);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  if (!foundUids.has('demo-user-1')) {
+    users.unshift({
+      uid: 'demo-user-1',
+      displayName: INITIAL_DEMO_PROFILE.displayName,
+      email: INITIAL_DEMO_PROFILE.email,
+      ideaCount: INITIAL_DEMO_IDEAS.length,
+    });
+  }
+
+  return users;
+}
+
+export function replaceWithSampleData(uid: string): UserDataStore {
+  const initialConfig = loadScoringConfig();
+  const rankedIdeas = rankAllIdeas(INITIAL_DEMO_IDEAS, INITIAL_DEMO_PROFILE, INITIAL_DEMO_GOALS, initialConfig);
+  const store: UserDataStore = {
+    profile: { ...INITIAL_DEMO_PROFILE, uid, updatedAt: Date.now() },
+    goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: uid })),
+    ideas: rankedIdeas.map((i) => ({ ...i, userId: uid, isAiScoring: false, pinnedBucket: null })),
+    version: 2,
+  };
+  saveUserData(uid, store);
+  return store;
+}
+
 export function loadUserData(uid: string): UserDataStore {
   const key = `${STORAGE_KEYS.USERS_PREFIX}${uid}`;
   const raw = localStorage.getItem(key);
 
   if (!raw) {
-    // If demo user or empty, initialize with rich demo data
-    const initialConfig = loadScoringConfig();
-    const rankedIdeas = rankAllIdeas(INITIAL_DEMO_IDEAS, INITIAL_DEMO_PROFILE, INITIAL_DEMO_GOALS, initialConfig);
-    const store: UserDataStore = {
-      profile: { ...INITIAL_DEMO_PROFILE, uid },
-      goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: uid })),
-      ideas: rankedIdeas.map((i) => ({ ...i, userId: uid })),
-    };
-    saveUserData(uid, store);
-    return store;
+    if (uid === 'demo-user-1') {
+      // Alex Chen sample demo user
+      const initialConfig = loadScoringConfig();
+      const rankedIdeas = rankAllIdeas(INITIAL_DEMO_IDEAS, INITIAL_DEMO_PROFILE, INITIAL_DEMO_GOALS, initialConfig);
+      const store: UserDataStore = {
+        profile: { ...INITIAL_DEMO_PROFILE, uid },
+        goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: uid })),
+        ideas: rankedIdeas.map((i) => ({ ...i, userId: uid, isAiScoring: false, pinnedBucket: null })),
+        version: 2,
+      };
+      saveUserData(uid, store);
+      return store;
+    } else {
+      // New user gets an EMPTY board: NO demo goals and NO demo ideas
+      const newProfile: UserProfile = {
+        uid,
+        displayName: 'New User',
+        email: '',
+        aboutMe: '',
+        situation: 'employed_full',
+        skills: [],
+        hoursPerWeek: 10,
+        riskAppetite: 'medium',
+        onboardingDone: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      const store: UserDataStore = {
+        profile: newProfile,
+        goals: [],
+        ideas: [],
+        version: 2,
+      };
+      saveUserData(uid, store);
+      return store;
+    }
   }
 
   try {
     const parsed = JSON.parse(raw) as UserDataStore;
     const config = loadScoringConfig();
+
+    // 1. Never load stuck isAiScoring state
+    let ideas = (parsed.ideas || []).map((idea) => ({
+      ...idea,
+      isAiScoring: false,
+    }));
+
+    // 2. One-time clean-up on load: set pinnedBucket to null on all existing ideas, recorded via version 2
+    const needsPinCleanup = !parsed.version || parsed.version < 2;
+    if (needsPinCleanup) {
+      ideas = ideas.map((idea) => ({
+        ...idea,
+        pinnedBucket: null,
+      }));
+      parsed.version = 2;
+    }
+
     // Ensure all ideas have updated ranks & breakdown
-    parsed.ideas = rankAllIdeas(parsed.ideas, parsed.profile, parsed.goals, config);
+    parsed.ideas = rankAllIdeas(ideas, parsed.profile, parsed.goals, config);
+
+    if (needsPinCleanup) {
+      saveUserData(uid, parsed);
+    }
+
     return parsed;
   } catch (err) {
     console.error('Failed to parse user data:', err);
@@ -318,13 +425,27 @@ export function loadUserData(uid: string): UserDataStore {
       profile: { ...INITIAL_DEMO_PROFILE, uid },
       goals: [],
       ideas: [],
+      version: 2,
     };
   }
 }
 
 export function saveUserData(uid: string, data: UserDataStore): void {
   const key = `${STORAGE_KEYS.USERS_PREFIX}${uid}`;
-  localStorage.setItem(key, JSON.stringify(data));
+  // Never save isAiScoring to persistent storage
+  const cleanIdeas = (data.ideas || []).map((idea) => {
+    const copy = { ...idea };
+    delete copy.isAiScoring;
+    return copy;
+  });
+
+  const payload: UserDataStore = {
+    ...data,
+    ideas: cleanIdeas,
+    version: data.version ?? 2,
+  };
+
+  localStorage.setItem(key, JSON.stringify(payload));
 }
 
 export function exportUserDataAsJson(uid: string): string {
@@ -333,7 +454,7 @@ export function exportUserDataAsJson(uid: string): string {
   const exportPayload = {
     exportedAt: new Date().toISOString(),
     version: '1.0',
-    app: 'IdeaBoard',
+    app: 'MessIdea',
     config,
     ...data,
   };
@@ -343,7 +464,7 @@ export function exportUserDataAsJson(uid: string): string {
 export function importUserDataFromJson(uid: string, jsonString: string): UserDataStore {
   const parsed = JSON.parse(jsonString);
   if (!parsed.profile || !Array.isArray(parsed.goals) || !Array.isArray(parsed.ideas)) {
-    throw new Error('Invalid IdeaBoard backup file format. Missing profile, goals, or ideas.');
+    throw new Error('Invalid MessIdea backup file format. Missing profile, goals, or ideas.');
   }
 
   const profile: UserProfile = {

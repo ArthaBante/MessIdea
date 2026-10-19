@@ -106,7 +106,7 @@ app.post('/api/score-idea', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const systemInstruction = `You are the scoring assistant inside IdeaBoard, an app that helps one person decide which of their ideas to work on.
+    const systemInstruction = `You are the scoring assistant inside MessIdea, an app that helps one person decide which of their ideas to work on.
 You receive the person's profile, their active goals, and one idea.
 Score the idea honestly against THIS person's goals, skills and available time — not against an average person.
 Rules:
@@ -148,7 +148,6 @@ About: ${profile?.aboutMe || 'Not provided'}
 Situation: ${profile?.situation || 'not specified'}
 Skills: ${Array.isArray(profile?.skills) ? profile.skills.join(', ') : 'Not provided'}
 Hours per week available: ${profile?.hoursPerWeek ?? 10}
-Risk appetite: ${profile?.riskAppetite || 'medium'}
 
 ACTIVE GOALS
 ${goalsText}
@@ -309,7 +308,7 @@ app.post('/api/weekly-review', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const systemInstruction = `You are writing a short weekly review for one IdeaBoard user.
+    const systemInstruction = `You are writing a short weekly review for one MessIdea user.
 Input: their goals, the ideas in Now and Next with scores and statuses, ideas that changed bucket this week, and stale ideas (no activity in 14+ days).
 Write at most 120 words: what moved, what is stuck, and the ONE idea to focus on next week and why, tied to a goal.
 Be direct. No praise, no filler. Return JSON: { "summary": string, "focusIdeaId": string }.`;
@@ -402,7 +401,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`IdeaBoard server running on http://0.0.0.0:${PORT}`);
+    console.log(`MessIdea server running on http://0.0.0.0:${PORT}`);
   });
 }
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_SCORING_CONFIG } from '../shared/scoringConfig';
 import { verifyWorkedExample } from '../shared/scoring';
+import { ConfirmModal } from './ConfirmModal';
 
 interface SettingsViewProps {
   profile: UserProfile;
@@ -47,6 +48,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [configForm, setConfigForm] = useState<ScoringConfig>(scoringConfig);
   const [testResult, setTestResult] = useState<ReturnType<typeof verifyWorkedExample> | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,9 +109,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (text) {
         try {
           onImportJson(text);
-          alert('Data imported successfully!');
+          setImportStatus('Data imported successfully!');
+          setTimeout(() => setImportStatus(null), 3000);
         } catch (err: any) {
-          alert('Failed to import JSON: ' + err.message);
+          setImportStatus('Failed to import JSON: ' + (err?.message || 'Invalid format'));
+          setTimeout(() => setImportStatus(null), 4000);
         }
       }
     };
@@ -131,7 +136,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         <button
           onClick={onRestartOnboarding}
-          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400 hover:bg-blue-100 transition-colors"
+          className="text-xs font-semibold px-4 py-2 min-h-[44px] rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400 hover:bg-blue-100 transition-colors flex items-center justify-center"
         >
           Re-run Onboarding
         </button>
@@ -254,26 +259,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </span>
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Risk Appetite (Affects uncertainty penalty)
-              </label>
-              <select
-                value={profileForm.riskAppetite}
-                onChange={(e) =>
-                  setProfileForm({
-                    ...profileForm,
-                    riskAppetite: e.target.value as RiskAppetite,
-                  })
-                }
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none"
-              >
-                <option value="low">Low (Heavy penalty for vague/uncertain ideas: r=0.40)</option>
-                <option value="medium">Medium (Balanced calibration: r=0.30)</option>
-                <option value="high">High (High tolerance for uncertainty: r=0.15)</option>
-              </select>
-            </div>
           </div>
 
           <div className="flex items-center justify-between pt-3">
@@ -285,7 +270,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+              className="px-5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center justify-center transition-colors"
             >
               Save Profile Changes
             </button>
@@ -295,7 +280,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Formula Verification & Tunable Weights */}
       <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <FlaskConical className="w-4 h-4 text-purple-600" />
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -304,16 +289,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
           <button
             onClick={handleRunTest}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 hover:bg-purple-100"
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 hover:bg-purple-100 transition-colors"
           >
-            <FlaskConical className="w-3.5 h-3.5" />
+            <FlaskConical className="w-4 h-4" />
             Run Worked Example Test
           </button>
         </div>
 
         {testResult && (
           <div
-            className={`p-3 rounded-xl border text-xs ${
+            className={`p-3.5 rounded-xl border text-xs ${
               testResult.passed
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
                 : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -327,7 +312,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   : 'Test FAILED'}
               </span>
             </div>
-            <p className="text-[11px] leading-relaxed">
+            <p className="text-xs leading-relaxed">
               {testResult.details}
             </p>
           </div>
@@ -391,15 +376,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {/* Export JSON */}
           <button
             onClick={onExportJson}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 transition-colors"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-4 h-4" />
             Export Data as JSON
           </button>
 
           {/* Import JSON */}
-          <label className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors">
-            <Upload className="w-3.5 h-3.5" />
+          <label className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 cursor-pointer transition-colors">
+            <Upload className="w-4 h-4" />
             <span>Import / Restore JSON</span>
             <input
               type="file"
@@ -409,24 +394,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             />
           </label>
 
-          {/* Reset Demo Data */}
+          {/* Replace Board with Sample Data */}
           <button
-            onClick={() => {
-              if (
-                window.confirm(
-                  'Reset all ideas, goals, and profile to the default demo state?'
-                )
-              ) {
-                onResetData();
-              }
-            }}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors ml-auto"
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors sm:ml-auto cursor-pointer"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            Reset to Sample Data
+            <Trash2 className="w-4 h-4" />
+            Replace my board with sample data
           </button>
         </div>
       </div>
+
+      {/* Confirmation dialog for replacing board */}
+      <ConfirmModal
+        isOpen={showResetConfirm}
+        title="Replace my board with sample data?"
+        message="Your current ideas and goals will be lost."
+        confirmLabel="Replace"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        onConfirm={() => {
+          setShowResetConfirm(false);
+          onResetData();
+        }}
+        onCancel={() => setShowResetConfirm(false)}
+      />
     </div>
   );
 };

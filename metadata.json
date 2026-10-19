@@ -1,5 +1,5 @@
 {
-  "name": "IdeaBoard",
+  "name": "MessIdea",
   "description": "Capture ideas in under 30 seconds and get an explainable, goal-driven ranking telling you what to work on Now, Next, Later, or Park.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

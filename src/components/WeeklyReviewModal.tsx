@@ -37,9 +37,9 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Compute stale ideas in Now (no activity for 14+ days)
-  const nowIdeas = ideas.filter((i) => i.bucket === 'now' && i.status !== 'done');
-  const nextIdeas = ideas.filter((i) => i.bucket === 'next' && i.status !== 'done');
+  // Compute stale ideas in Now (no activity for 14+ days), excluding Done and Dropped
+  const nowIdeas = ideas.filter((i) => i.bucket === 'now' && i.status !== 'done' && i.status !== 'dropped');
+  const nextIdeas = ideas.filter((i) => i.bucket === 'next' && i.status !== 'done' && i.status !== 'dropped');
 
   const staleIdeas = nowIdeas
     .map((idea) => {
@@ -102,21 +102,22 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Weekly Strategic Review
               </h3>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 Audits progress, flags stale ideas, and locks in next week's single focus
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            aria-label="Close review"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+        <div className="p-6 space-y-6 max-h-[75dvh] overflow-y-auto">
           {/* Stale Ideas Alert */}
           {staleIdeas.length > 0 && (
             <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-2">
@@ -137,12 +138,12 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
                       onClose();
                       onSelectIdea(s.idea);
                     }}
-                    className="flex items-center justify-between p-2 rounded-lg bg-white/80 dark:bg-slate-900/60 border border-rose-200/60 text-xs cursor-pointer hover:bg-white transition-colors"
+                    className="flex items-center justify-between p-3 min-h-[44px] rounded-xl bg-white/80 dark:bg-slate-900/60 border border-rose-200/60 text-xs cursor-pointer hover:bg-white transition-colors"
                   >
                     <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
                       {s.title}
                     </span>
-                    <span className="text-rose-600 dark:text-rose-400 font-bold text-[11px] shrink-0 ml-2">
+                    <span className="text-rose-600 dark:text-rose-400 font-bold text-xs shrink-0 ml-2">
                       {s.daysInactive} days inactive
                     </span>
                   </div>
@@ -167,7 +168,7 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
               {/* Recommended Focus Idea */}
               {focusIdea && (
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
                     🎯 Recommended Focus for the Week
                   </span>
                   <div className="flex items-center justify-between gap-3">
@@ -186,7 +187,7 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
                         onClose();
                         onSelectIdea(focusIdea);
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold shrink-0"
+                      className="px-4 py-2 min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 flex items-center justify-center transition-colors"
                     >
                       Open Idea
                     </button>
@@ -202,7 +203,7 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
               <button
                 onClick={handleGenerateReview}
                 disabled={loading}
-                className="px-4 py-2 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-xs inline-flex items-center gap-2 transition-all"
+                className="px-5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-xs inline-flex items-center gap-2 transition-all"
               >
                 <Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span>{loading ? 'Analyzing your board...' : 'Generate Weekly Review'}</span>
@@ -223,7 +224,7 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
             <button
               onClick={handleGenerateReview}
               disabled={loading}
-              className="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline inline-flex items-center gap-1"
+              className="min-h-[44px] px-3 text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline inline-flex items-center gap-1"
             >
               <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
               Regenerate Review
@@ -231,7 +232,7 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
           )}
           <button
             onClick={onClose}
-            className="ml-auto px-4 py-1.5 text-xs font-medium rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300"
+            className="ml-auto px-5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center"
           >
             Done
           </button>
