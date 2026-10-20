@@ -31,6 +31,7 @@ interface IdeaCardProps {
   isMenuOpen?: boolean;
   onToggleMenu?: () => void;
   onCloseMenu?: () => void;
+  aiEnabled: boolean;
 }
 
 export const IdeaCard: React.FC<IdeaCardProps> = ({
@@ -45,6 +46,7 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
   isMenuOpen,
   onToggleMenu,
   onCloseMenu,
+  aiEnabled,
 }) => {
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -127,29 +129,48 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
                 <span>Scoring…</span>
               </div>
             ) : idea.scoresSource === 'unscored' ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRetryAiScoring(idea);
-                }}
-                className={`min-h-[36px] px-2.5 py-1 rounded-full text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer ${
-                  idea.aiError
-                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800'
-                    : 'bg-slate-100 text-slate-700 hover:bg-blue-100 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-blue-900'
-                }`}
-                title={idea.aiError ? `AI Error: ${idea.aiError}. Click to retry.` : 'Scoring…'}
-              >
-                {idea.aiError ? 'Not scored · Retry' : 'Scoring…'}
-              </button>
+              aiEnabled ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetryAiScoring(idea);
+                  }}
+                  className={`min-h-[36px] px-2.5 py-1 rounded-full text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer ${
+                    idea.aiError
+                      ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800'
+                      : 'bg-slate-100 text-slate-700 hover:bg-blue-100 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-blue-900'
+                  }`}
+                  title={idea.aiError ? `AI Error: ${idea.aiError}. Click to retry.` : 'Scoring…'}
+                >
+                  {idea.aiError ? 'Not scored · Retry' : 'Scoring…'}
+                </button>
+              ) : (
+                <div className="text-[10px] text-slate-400 italic px-2">AI is off</div>
+              )
             ) : (
-              <div
-                title={`Priority Score: ${idea.priorityScore}/100`}
-                className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-tight ${getScoreBadgeClass(
-                  idea.priorityScore
-                )}`}
-              >
-                {idea.priorityScore}
+              <div className="flex items-center gap-1">
+                {aiEnabled && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetryAiScoring(idea);
+                    }}
+                    className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500"
+                    title="Re-score with AI"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div
+                  title={`Priority Score: ${idea.priorityScore}/100`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-tight ${getScoreBadgeClass(
+                    idea.priorityScore
+                  )}`}
+                >
+                  {idea.priorityScore}
+                </div>
               </div>
             )}
 

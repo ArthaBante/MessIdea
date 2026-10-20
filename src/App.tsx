@@ -106,6 +106,16 @@ export default function App() {
     });
   };
 
+  const [aiEnabled, setAiEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('ideaboard_ai_enabled');
+    return saved !== 'false'; // default true
+  });
+
+  const handleToggleAi = (enabled: boolean) => {
+    setAiEnabled(enabled);
+    localStorage.setItem('ideaboard_ai_enabled', String(enabled));
+  };
+
   // User ID persistence: saveCurrentUserId whenever it changes or on logout
   useEffect(() => {
     if (isLoggedOut) {
@@ -180,6 +190,7 @@ export default function App() {
   // Background AI scoring trigger: always saves latest profile and goals when done
   const triggerAiScoring = useCallback(
     async (ideaToScore: Idea, currentProfile: UserProfile, currentGoals: Goal[]) => {
+      if (!aiEnabled) return; // Requirement: When AI is off, make no AI calls.
       setIdeas((prev) =>
         prev.map((i) => (i.id === ideaToScore.id ? { ...i, isAiScoring: true, aiError: undefined } : i))
       );
@@ -346,17 +357,19 @@ export default function App() {
       followUpAnswers: [],
       notes: [],
       links: [],
-      scoresSource: 'unscored',
+      scoresSource: aiEnabled ? 'unscored' : 'user', // Requirement: When AI is off, new idea gets scoresSource 'user' and shows its formula score straight away.
       userEditedScores: {},
       lastActivityAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      isAiScoring: true,
+      isAiScoring: aiEnabled, // Requirement: If AI on, it's scoring, if off it's not.
     };
 
     const nextIdeas = [newIdea, ...ideas];
     updateAndPersist(nextIdeas, profile, goals);
-    triggerAiScoring(newIdea, profile, goals);
+    if (aiEnabled) {
+      triggerAiScoring(newIdea, profile, goals);
+    }
   };
 
   // Re-score single idea from detail modal
@@ -720,6 +733,7 @@ export default function App() {
             onRetryAiScoring={(idea) => triggerAiScoring(idea, profile, goals)}
             onDeleteIdea={handleDeleteIdea}
             onOpenQuickCapture={() => setQuickCaptureOpen(true)}
+            aiEnabled={aiEnabled}
           />
         )}
 
@@ -751,6 +765,8 @@ export default function App() {
             onImportJson={handleImportJson}
             onResetData={handleResetData}
             onRestartOnboarding={() => setOnboardingOpen(true)}
+            aiEnabled={aiEnabled}
+            onToggleAi={handleToggleAi}
           />
         )}
       </main>
@@ -782,6 +798,7 @@ export default function App() {
         onDeleteIdea={handleDeleteIdea}
         onReScoreWithAi={handleReScoreWithAi}
         isAiScoring={Boolean(selectedIdea?.isAiScoring)}
+        aiEnabled={aiEnabled}
       />
 
       <WeeklyReviewModal
@@ -794,6 +811,7 @@ export default function App() {
           setWeeklyReviewOpen(false);
           setSelectedIdeaId(idea.id);
         }}
+        aiEnabled={aiEnabled}
       />
 
       <OnboardingModal

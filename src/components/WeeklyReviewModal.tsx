@@ -21,6 +21,7 @@ interface WeeklyReviewModalProps {
   goals: Goal[];
   ideas: Idea[];
   onSelectIdea: (idea: Idea) => void;
+  aiEnabled: boolean;
 }
 
 export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
@@ -30,6 +31,7 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
   goals,
   ideas,
   onSelectIdea,
+  aiEnabled,
 }) => {
   const [loading, setLoading] = useState(false);
   const [reviewResult, setReviewResult] = useState<WeeklyReviewResult | null>(null);
@@ -198,16 +200,20 @@ export const WeeklyReviewModal: React.FC<WeeklyReviewModalProps> = ({
           ) : (
             <div className="text-center py-6 space-y-3">
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Generate your personalized AI weekly digest analyzing what moved, what is stuck, and your top priority recommendation.
+                {aiEnabled
+                  ? 'Generate your personalized AI weekly digest analyzing what moved, what is stuck, and your top priority recommendation.'
+                  : 'AI is off — turn it on in Settings to generate a weekly review.'}
               </p>
-              <button
-                onClick={handleGenerateReview}
-                disabled={loading}
-                className="px-5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-xs inline-flex items-center gap-2 transition-all"
-              >
-                <Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>{loading ? 'Analyzing your board...' : 'Generate Weekly Review'}</span>
-              </button>
+              {aiEnabled && (
+                <button
+                  onClick={handleGenerateReview}
+                  disabled={loading}
+                  className="px-5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-xs inline-flex items-center gap-2 transition-all"
+                >
+                  <Sparkles className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span>{loading ? 'Analyzing your board...' : 'Generate Weekly Review'}</span>
+                </button>
+              )}
             </div>
           )}
 

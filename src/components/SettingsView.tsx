@@ -31,6 +31,8 @@ interface SettingsViewProps {
   onImportJson: (jsonStr: string) => void;
   onResetData: () => void;
   onRestartOnboarding: () => void;
+  aiEnabled: boolean;
+  onToggleAi: (enabled: boolean) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -42,6 +44,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onImportJson,
   onResetData,
   onRestartOnboarding,
+  aiEnabled,
+  onToggleAi,
 }) => {
   const [profileForm, setProfileForm] = useState<UserProfile>(profile);
   const [skillInput, setSkillInput] = useState('');
@@ -134,12 +138,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onRestartOnboarding}
-          className="text-xs font-semibold px-4 py-2 min-h-[44px] rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400 hover:bg-blue-100 transition-colors flex items-center justify-center"
-        >
-          Re-run Onboarding
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">AI Features</span>
+            <input
+              type="checkbox"
+              checked={aiEnabled}
+              onChange={(e) => onToggleAi(e.target.checked)}
+              className="w-8 h-4 bg-slate-200 rounded-full appearance-none checked:bg-blue-600 transition-colors cursor-pointer"
+            />
+          </label>
+          <button
+            onClick={onRestartOnboarding}
+            className="text-xs font-semibold px-4 py-2 min-h-[44px] rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400 hover:bg-blue-100 transition-colors flex items-center justify-center"
+          >
+            Re-run Onboarding
+          </button>
+        </div>
       </div>
 
       {/* Profile Form */}

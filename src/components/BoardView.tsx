@@ -31,6 +31,7 @@ interface BoardViewProps {
   onRetryAiScoring: (idea: Idea) => void;
   onDeleteIdea: (ideaId: string) => void;
   onOpenQuickCapture: () => void;
+  aiEnabled: boolean;
 }
 
 interface DraggableIdeaCardProps {
@@ -45,6 +46,7 @@ interface DraggableIdeaCardProps {
   isMenuOpen: boolean;
   onToggleMenu: () => void;
   onCloseMenu: () => void;
+  aiEnabled: boolean;
 }
 
 const DraggableIdeaCard: React.FC<DraggableIdeaCardProps> = (props) => {
@@ -72,6 +74,7 @@ const DraggableIdeaCard: React.FC<DraggableIdeaCardProps> = (props) => {
         isMenuOpen={props.isMenuOpen}
         onToggleMenu={props.onToggleMenu}
         onCloseMenu={props.onCloseMenu}
+        aiEnabled={props.aiEnabled}
       />
     </div>
   );
@@ -139,6 +142,7 @@ const DroppableDesktopColumn: React.FC<{
   openMenuCardId: string | null;
   onToggleCardMenu: (cardId: string) => void;
   onCloseCardMenu: () => void;
+  aiEnabled: boolean;
 }> = ({
   bucket,
   columnIdeas,
@@ -155,6 +159,7 @@ const DroppableDesktopColumn: React.FC<{
   openMenuCardId,
   onToggleCardMenu,
   onCloseCardMenu,
+  aiEnabled,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: `desktop-col-${bucket}`,
@@ -247,6 +252,7 @@ const DroppableDesktopColumn: React.FC<{
                 isMenuOpen={openMenuCardId === idea.id}
                 onToggleMenu={() => onToggleCardMenu(idea.id)}
                 onCloseMenu={onCloseCardMenu}
+                aiEnabled={aiEnabled}
               />
             );
           })
@@ -266,6 +272,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   onRetryAiScoring,
   onDeleteIdea,
   onOpenQuickCapture,
+  aiEnabled,
 }) => {
   const [mobileBucket, setMobileBucket] = useState<Bucket>('now');
   const [activeDragIdeaId, setActiveDragIdeaId] = useState<string | null>(null);
@@ -524,6 +531,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                       isMenuOpen={openMenuCardId === idea.id}
                       onToggleMenu={() => handleToggleCardMenu(idea.id)}
                       onCloseMenu={handleCloseCardMenu}
+                      aiEnabled={aiEnabled}
                     />
                   );
                 })
@@ -552,6 +560,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
               openMenuCardId={openMenuCardId}
               onToggleCardMenu={handleToggleCardMenu}
               onCloseCardMenu={handleCloseCardMenu}
+              aiEnabled={aiEnabled}
             />
           ))}
         </div>
@@ -569,6 +578,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
               onStatusChange={() => {}}
               onRetryAiScoring={() => {}}
               isStale={false}
+              aiEnabled={aiEnabled}
             />
           </div>
         ) : null}

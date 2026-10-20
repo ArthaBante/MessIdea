@@ -80,7 +80,7 @@ function formatErrorMessage(error: any): string {
   return rawMsg;
 }
 
-async function generateWithRetry(params: any, retries = 2, delayMs = 1500) {
+async function generateWithRetry(params: any, retries = 0, delayMs = 1500) {
   if (!ai) {
     throw new Error('GEMINI_API_KEY is not configured on the server');
   }
@@ -88,18 +88,11 @@ async function generateWithRetry(params: any, retries = 2, delayMs = 1500) {
     try {
       return await ai.models.generateContent(params);
     } catch (err: any) {
-      const is503 =
-        err?.message?.includes('503') ||
-        err?.status === 503 ||
-        err?.message?.includes('high demand');
-      if (is503 && attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
-        continue;
-      }
+      // Retries are disabled
       throw err;
     }
   }
-  throw new Error('Failed to generate content after retries');
+  throw new Error('Failed to generate content');
 }
 
 // 1. Idea Scoring endpoint
@@ -316,8 +309,10 @@ confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
     });
   } catch (error: any) {
     console.error('Error during AI scoring:', error);
+    const msg = formatErrorMessage(error);
+    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted');
     res.status(500).json({
-      error: formatErrorMessage(error),
+      error: isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg,
       code: 'SCORING_FAILED',
     });
   }
@@ -424,8 +419,10 @@ HOURS PER WEEK AVAILABLE: ${profile?.hoursPerWeek ?? 10}`;
     });
   } catch (err: any) {
     console.error('Error in suggest-next-steps:', err);
+    const msg = formatErrorMessage(err);
+    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted');
     res.status(500).json({
-      error: formatErrorMessage(err),
+      error: isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg,
       code: 'SUGGEST_STEPS_FAILED',
     });
   }

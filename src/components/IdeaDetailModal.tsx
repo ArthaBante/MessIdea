@@ -44,6 +44,7 @@ interface IdeaDetailModalProps {
   onDeleteIdea: (ideaId: string) => void;
   onReScoreWithAi: (idea: Idea) => Promise<void>;
   isAiScoring: boolean;
+  aiEnabled: boolean;
 }
 
 export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
@@ -56,6 +57,7 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
   onDeleteIdea,
   onReScoreWithAi,
   isAiScoring,
+  aiEnabled,
 }) => {
   const [formData, setFormData] = useState<Idea | null>(null);
   const [activeTab, setActiveTab] = useState<'scores' | 'reasoning' | 'questions' | 'notes' | 'links'>('scores');
@@ -698,27 +700,43 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                     <span>Scoring…</span>
                   </div>
                 ) : formData.scoresSource === 'unscored' ? (
-                  formData.aiError ? (
-                    <button
-                      type="button"
-                      onClick={handleReScoreWithAi}
-                      className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
-                      title={formData.aiError}
-                    >
-                      Not scored · Retry
-                    </button>
+                  aiEnabled ? (
+                    formData.aiError ? (
+                      <button
+                        type="button"
+                        onClick={handleReScoreWithAi}
+                        className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                        title={formData.aiError}
+                      >
+                        Not scored · Retry
+                      </button>
+                    ) : (
+                      <div className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold">
+                        Scoring…
+                      </div>
+                    )
                   ) : (
-                    <div className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold">
-                      Scoring…
-                    </div>
+                    <div className="text-xs text-slate-400 italic px-2">AI is off</div>
                   )
                 ) : (
-                  <div
-                    className={`px-3 py-1 rounded-xl text-base font-extrabold ${getScoreBadgeClass(
-                      previewScore
-                    )}`}
-                  >
-                    {previewScore}/100
+                  <div className="flex items-center gap-2">
+                    {aiEnabled && (
+                      <button
+                        type="button"
+                        onClick={handleReScoreWithAi}
+                        className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500"
+                        title="Re-score with AI"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div
+                      className={`px-3 py-1 rounded-xl text-base font-extrabold ${getScoreBadgeClass(
+                        previewScore
+                      )}`}
+                    >
+                      {previewScore}/100
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center gap-1 mt-1">
@@ -1634,11 +1652,11 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                         <button
                           type="button"
                           onClick={handleSubmitAllAnswersAndReScore}
-                          disabled={!hasNewText || isAiScoring}
+                          disabled={!hasNewText || isAiScoring || !aiEnabled}
                           className="px-5 py-2.5 min-h-[44px] text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                         >
                           <Sparkles className={`w-3.5 h-3.5 ${isAiScoring ? 'animate-spin' : ''}`} />
-                          <span>{isAiScoring ? 'Re-scoring with answers…' : 'Submit answers & Re-score'}</span>
+                          <span>{aiEnabled ? (isAiScoring ? 'Re-scoring with answers…' : 'Submit answers & Re-score') : 'AI is off — turn it on in Settings'}</span>
                         </button>
                       </div>
                     </div>
