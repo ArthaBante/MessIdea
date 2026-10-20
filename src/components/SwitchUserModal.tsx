@@ -69,7 +69,7 @@ export const SwitchUserModal: React.FC<SwitchUserModalProps> = ({
                   className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
                     isSelected
                       ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-850'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-800'
                   }`}
                 >
                   <button
@@ -117,13 +117,17 @@ export const SwitchUserModal: React.FC<SwitchUserModalProps> = ({
           </div>
 
           {/* Footer: New User Button or Inline Name Input */}
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-850/50">
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             {showNewInput ? (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!newName.trim()) return;
-                  onNewUserWithName?.(newName.trim()) || onNewUser();
+                  if (onNewUserWithName) {
+                    onNewUserWithName(newName.trim());
+                  } else {
+                    onNewUser();
+                  }
                   setNewName('');
                   setShowNewInput(false);
                   onClose();

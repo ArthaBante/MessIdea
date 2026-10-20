@@ -1602,7 +1602,7 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                               className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2.5"
                             >
                               <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-2xs font-extrabold flex items-center justify-center shrink-0">
+                                <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-[10px] font-extrabold flex items-center justify-center shrink-0">
                                   {idx + 1}
                                 </span>
                                 <span>{q}</span>
@@ -1657,7 +1657,7 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                                 <HelpCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                 <span>{qa.question}</span>
                               </p>
-                              <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
                                 Answered
                               </span>
                             </div>

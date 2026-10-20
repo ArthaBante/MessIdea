@@ -261,7 +261,6 @@ export function rankAllIdeas(
       ...idea,
       priorityScore,
       scoreBreakdown,
-      lastScoredAt: Date.now(),
     };
   });
 

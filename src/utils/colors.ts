@@ -78,7 +78,7 @@ export function getBucketDetails(bucket: Bucket): {
     case 'now':
       return {
         label: 'Now',
-        description: 'Focus here (max 3 ideas, within weekly hours)',
+        description: 'Focus here (within your weekly hours)',
         badgeBg: 'bg-emerald-100 dark:bg-emerald-950/60',
         badgeText: 'text-emerald-700 dark:text-emerald-300',
         borderColor: 'border-emerald-300 dark:border-emerald-800/80',
