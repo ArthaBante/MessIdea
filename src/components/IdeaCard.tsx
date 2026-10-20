@@ -121,10 +121,10 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
             {idea.isAiScoring ? (
               <div
                 title="AI is scoring this idea..."
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300 text-xs font-medium animate-pulse"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300 text-xs font-semibold animate-pulse"
               >
                 <Sparkles className="w-3 h-3 animate-spin" />
-                <span>Scoring...</span>
+                <span>Scoring…</span>
               </div>
             ) : idea.scoresSource === 'unscored' ? (
               <button
@@ -133,9 +133,14 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
                   e.stopPropagation();
                   onRetryAiScoring(idea);
                 }}
-                className="min-h-[44px] px-3 py-1 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors flex items-center justify-center cursor-pointer"
+                className={`min-h-[36px] px-2.5 py-1 rounded-full text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer ${
+                  idea.aiError
+                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800'
+                    : 'bg-slate-100 text-slate-700 hover:bg-blue-100 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-blue-900'
+                }`}
+                title={idea.aiError ? `AI Error: ${idea.aiError}. Click to retry.` : 'Scoring…'}
               >
-                Unscored
+                {idea.aiError ? 'Not scored · Retry' : 'Scoring…'}
               </button>
             ) : (
               <div
@@ -311,6 +316,20 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
           <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
             {idea.description}
           </p>
+        )}
+
+        {/* Real failure message shown on the card if AI scoring failed */}
+        {idea.aiError && !idea.isAiScoring && (
+          <div
+            className="mb-2.5 p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-1.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-semibold block">AI scoring notice:</span>
+              <span className="leading-snug">{idea.aiError}</span>
+            </div>
+          </div>
         )}
 
         {/* Linked Goal Chip */}

@@ -174,11 +174,27 @@ export function assignBuckets(
     (idea) => idea.pinnedBucket == null && idea.status !== 'in_progress' && idea.status !== 'paused'
   );
 
+  // Requirement: ideas with scoresSource 'unscored' always go to Next, never Now
+  const unscoredList: Idea[] = [];
+  const scoredCandidates: Idea[] = [];
+
+  for (const idea of unpinned) {
+    if (idea.scoresSource === 'unscored') {
+      unscoredList.push(idea);
+    } else {
+      scoredCandidates.push(idea);
+    }
+  }
+
+  for (const idea of unscoredList) {
+    bucketMap.set(idea.id, 'next');
+  }
+
   // Separate low goal fit (< cutoff) -> directly Parked
   const lowGoalFit: Idea[] = [];
   const candidates: Idea[] = [];
 
-  for (const idea of unpinned) {
+  for (const idea of scoredCandidates) {
     if (idea.scoreBreakdown.goalFit < config.thresholds.goalFitCutoff) {
       lowGoalFit.push(idea);
     } else {

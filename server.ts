@@ -113,7 +113,7 @@ Rules:
 - Use the 1–5 scales exactly as defined. Be calibrated: most ideas are 2–4 on most scales; reserve 5 for exceptional cases.
 - goalLinks: include every active goal, with fit 1 (does not help) to 5 (directly achieves it).
 - Do NOT score excitement; that belongs to the person.
-- If the idea is vague, lower confidence and ask up to 3 short follow-up questions that would most change the scores. Otherwise return an empty list.
+- If the idea is vague or lacks critical detail, lower confidence and ask at most 3 short, targeted follow-up questions that would most change the scores. NEVER repeat any questions or topics that have already been answered in 'Answers to earlier follow-up questions'. If no further clarification is needed, return an empty list [].
 - nextAction: one concrete step that takes under 2 hours.
 - reasoning: 2–4 plain sentences on how the idea serves (or doesn't serve) their goals and the main trade-off. Do not mention numeric scores.
 - Return only JSON matching the schema.`;
