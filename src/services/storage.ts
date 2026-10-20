@@ -279,20 +279,36 @@ export function loadScoringConfig(): ScoringConfig {
     const raw = localStorage.getItem(STORAGE_KEYS.SCORING_CONFIG);
     if (raw) {
       const parsed = { ...DEFAULT_SCORING_CONFIG, ...JSON.parse(raw) };
-      const total =
+      const sumFive =
         (parsed.goalFitWeight || 0) +
         (parsed.impactWeight || 0) +
         (parsed.urgencyWeight || 0) +
         (parsed.skillMatchWeight || 0) +
         (parsed.excitementWeight || 0);
 
-      // In loadScoringConfig: if saved weights don't add up to 100%, rescale them so they do.
-      if (Math.abs(total - 1.0) > 0.001 && total > 0) {
-        parsed.goalFitWeight = parsed.goalFitWeight / total;
-        parsed.impactWeight = parsed.impactWeight / total;
-        parsed.urgencyWeight = parsed.urgencyWeight / total;
-        parsed.skillMatchWeight = parsed.skillMatchWeight / total;
-        parsed.excitementWeight = parsed.excitementWeight / total;
+      // allow ±0.01
+      if (Math.abs(sumFive - 1.0) > 0.01) {
+        const targetOthers = Math.max(0, 1 - (parsed.goalFitWeight || 0));
+        const currentOthers =
+          (parsed.impactWeight || 0) +
+          (parsed.urgencyWeight || 0) +
+          (parsed.skillMatchWeight || 0) +
+          (parsed.excitementWeight || 0);
+
+        if (currentOthers > 0) {
+          const factor = targetOthers / currentOthers;
+          parsed.impactWeight *= factor;
+          parsed.urgencyWeight *= factor;
+          parsed.skillMatchWeight *= factor;
+          parsed.excitementWeight *= factor;
+        } else {
+          const each = targetOthers / 4;
+          parsed.impactWeight = each;
+          parsed.urgencyWeight = each;
+          parsed.skillMatchWeight = each;
+          parsed.excitementWeight = each;
+        }
+        saveScoringConfig(parsed);
       }
       return parsed;
     }
