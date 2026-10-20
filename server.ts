@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 app.use(express.json({ limit: '2mb' }));
 
@@ -190,7 +191,7 @@ effort: total work (1 a weekend, 3 a few weeks, 5 many months)
 confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
 
     const response = await generateWithRetry({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: userPrompt,
       config: {
         systemInstruction,
@@ -311,8 +312,10 @@ confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
     console.error('Error during AI scoring:', error);
     const msg = formatErrorMessage(error);
     const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted');
+    const isBusy = msg.includes('503') || msg.toLowerCase().includes('unavailable') || msg.toLowerCase().includes('high demand') || error?.status === 503;
+    const finalError = isBusy ? 'Gemini is busy, try again in a minute.' : (isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg);
     res.status(500).json({
-      error: isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg,
+      error: finalError,
       code: 'SCORING_FAILED',
     });
   }
@@ -387,7 +390,7 @@ ${answersText}
 HOURS PER WEEK AVAILABLE: ${profile?.hoursPerWeek ?? 10}`;
 
     const response = await generateWithRetry({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         systemInstruction,
@@ -421,8 +424,10 @@ HOURS PER WEEK AVAILABLE: ${profile?.hoursPerWeek ?? 10}`;
     console.error('Error in suggest-next-steps:', err);
     const msg = formatErrorMessage(err);
     const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted');
+    const isBusy = msg.includes('503') || msg.toLowerCase().includes('unavailable') || msg.toLowerCase().includes('high demand') || err?.status === 503;
+    const finalError = isBusy ? 'Gemini is busy, try again in a minute.' : (isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg);
     res.status(500).json({
-      error: isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg,
+      error: finalError,
       code: 'SUGGEST_STEPS_FAILED',
     });
   }
@@ -494,7 +499,7 @@ STALE IDEAS: ${staleSummary}
 RECENT SHIFTS: ${movesSummary}`;
 
     const response = await generateWithRetry({
-      model: 'gemini-3.8-flash',
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         systemInstruction,
@@ -521,8 +526,12 @@ RECENT SHIFTS: ${movesSummary}`;
     });
   } catch (err: any) {
     console.error('Error in weekly review:', err);
+    const msg = formatErrorMessage(err);
+    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted');
+    const isBusy = msg.includes('503') || msg.toLowerCase().includes('unavailable') || msg.toLowerCase().includes('high demand') || err?.status === 503;
+    const finalError = isBusy ? 'Gemini is busy, try again in a minute.' : (isQuota ? 'Daily AI limit reached. It resets at 8am UK time. You can still set scores yourself.' : msg);
     res.status(500).json({
-      error: formatErrorMessage(err),
+      error: finalError,
       code: 'WEEKLY_REVIEW_FAILED',
     });
   }

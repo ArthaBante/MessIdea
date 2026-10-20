@@ -323,7 +323,7 @@ export default function App() {
         return reranked;
       });
     },
-    [userId, scoringConfig]
+    [userId, scoringConfig, aiEnabled]
   );
 
   // Quick Capture Save: saves in 1 click and immediately kicks off AI scoring

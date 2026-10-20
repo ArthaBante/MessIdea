@@ -456,6 +456,7 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
   };
 
   const handleSuggestNextSteps = async () => {
+    if (!aiEnabled) return;
     if (!formData) return;
     // Saves the draft first
     const toSave: Idea = {

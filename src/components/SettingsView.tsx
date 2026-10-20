@@ -54,6 +54,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const handleGoalFitWeightChange = (newGoalFit: number) => {
+    const currentOthersSum =
+      configForm.impactWeight +
+      configForm.urgencyWeight +
+      configForm.skillMatchWeight +
+      configForm.excitementWeight;
+
+    const targetOthersSum = Math.max(0, 1 - newGoalFit);
+    let updated: ScoringConfig;
+
+    if (currentOthersSum > 0) {
+      const factor = targetOthersSum / currentOthersSum;
+      updated = {
+        ...configForm,
+        goalFitWeight: newGoalFit,
+        impactWeight: configForm.impactWeight * factor,
+        urgencyWeight: configForm.urgencyWeight * factor,
+        skillMatchWeight: configForm.skillMatchWeight * factor,
+        excitementWeight: configForm.excitementWeight * factor,
+      };
+    } else {
+      const each = targetOthersSum / 4;
+      updated = {
+        ...configForm,
+        goalFitWeight: newGoalFit,
+        impactWeight: each,
+        urgencyWeight: each,
+        skillMatchWeight: each,
+        excitementWeight: each,
+      };
+    }
+    setConfigForm(updated);
+    onUpdateScoringConfig(updated);
+  };
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -333,40 +369,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
 
-        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-              Goal Fit Weight: {(configForm.goalFitWeight * 100).toFixed(0)}%
-            </label>
-            <input
-              type="range"
-              min={0.1}
-              max={0.7}
-              step={0.05}
-              value={configForm.goalFitWeight}
-              onChange={(e) =>
-                handleConfigChange('goalFitWeight', parseFloat(e.target.value))
-              }
-              className="w-full accent-blue-600"
-            />
-          </div>
+        {/* Advanced scoring weights collapsible */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(!advancedOpen)}
+            className="w-full flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 py-2 cursor-pointer"
+          >
+            <span>Advanced: scoring weights</span>
+            <span>{advancedOpen ? '▴' : '▾'}</span>
+          </button>
 
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-              Effort Penalty Weight: {(configForm.effortPenaltyWeight * 100).toFixed(0)}%
-            </label>
-            <input
-              type="range"
-              min={0.1}
-              max={0.6}
-              step={0.05}
-              value={configForm.effortPenaltyWeight}
-              onChange={(e) =>
-                handleConfigChange('effortPenaltyWeight', parseFloat(e.target.value))
-              }
-              className="w-full accent-blue-600"
-            />
-          </div>
+          {advancedOpen && (
+            <div className="pt-3 space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  Goal Fit Weight: {(configForm.goalFitWeight * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={0.8}
+                  step={0.05}
+                  value={configForm.goalFitWeight}
+                  onChange={(e) =>
+                    handleGoalFitWeightChange(parseFloat(e.target.value))
+                  }
+                  className="w-full accent-blue-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Impact Weight:</span>{' '}
+                  <strong className="text-slate-900 dark:text-white">{(configForm.impactWeight * 100).toFixed(0)}%</strong>
+                </div>
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Urgency Weight:</span>{' '}
+                  <strong className="text-slate-900 dark:text-white">{(configForm.urgencyWeight * 100).toFixed(0)}%</strong>
+                </div>
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Skill Match Weight:</span>{' '}
+                  <strong className="text-slate-900 dark:text-white">{(configForm.skillMatchWeight * 100).toFixed(0)}%</strong>
+                </div>
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Excitement Weight:</span>{' '}
+                  <strong className="text-slate-900 dark:text-white">{(configForm.excitementWeight * 100).toFixed(0)}%</strong>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  Effort Penalty Weight: {(configForm.effortPenaltyWeight * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={0.6}
+                  step={0.05}
+                  value={configForm.effortPenaltyWeight}
+                  onChange={(e) =>
+                    handleConfigChange('effortPenaltyWeight', parseFloat(e.target.value))
+                  }
+                  className="w-full accent-blue-600"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="pt-2 flex justify-end">
