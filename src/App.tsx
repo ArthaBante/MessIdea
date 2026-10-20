@@ -769,6 +769,7 @@ export default function App() {
             onRestartOnboarding={() => setOnboardingOpen(true)}
             aiEnabled={aiEnabled}
             onToggleAi={handleToggleAi}
+            onDone={() => setCurrentView('board')}
           />
         )}
       </main>

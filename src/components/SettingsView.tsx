@@ -33,6 +33,7 @@ interface SettingsViewProps {
   onRestartOnboarding: () => void;
   aiEnabled: boolean;
   onToggleAi: (enabled: boolean) => void;
+  onDone?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -46,6 +47,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onRestartOnboarding,
   aiEnabled,
   onToggleAi,
+  onDone,
 }) => {
   const [profileForm, setProfileForm] = useState<UserProfile>(profile);
   const [skillInput, setSkillInput] = useState('');
@@ -98,7 +100,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       updatedAt: Date.now(),
     });
     setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2500);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      onDone?.();
+    }, 800);
   };
 
   const handleAddSkill = (e: React.KeyboardEvent) => {
@@ -200,7 +205,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           Personal Profile & Calibration Inputs
         </h3>
 
-        <form onSubmit={handleProfileSubmit} className="space-y-4">
+        <form id="profile-form" onSubmit={handleProfileSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -310,21 +315,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </span>
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-3">
-            {saveSuccess ? (
-              <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                <CheckCircle className="w-4 h-4" /> Profile updated & ideas re-ranked!
-              </span>
-            ) : <span />}
-
-            <button
-              type="submit"
-              className="px-5 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center justify-center transition-colors"
-            >
-              Save Profile Changes
-            </button>
           </div>
         </form>
       </div>
@@ -488,6 +478,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             Replace my board with sample data
           </button>
         </div>
+      </div>
+
+      {/* Bottom Save Bar */}
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+        {saveSuccess ? (
+          <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+            <CheckCircle className="w-4 h-4" /> Saved! Returning to board...
+          </span>
+        ) : (
+          <span className="text-xs text-slate-500">
+            Changes to your profile and hours will re-rank your idea board.
+          </span>
+        )}
+
+        <button
+          type="submit"
+          form="profile-form"
+          className="w-full sm:w-auto px-6 py-3 min-h-[44px] text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center justify-center transition-colors cursor-pointer"
+        >
+          Save Profile Changes
+        </button>
       </div>
 
       {/* Confirmation dialog for replacing board */}
