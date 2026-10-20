@@ -700,25 +700,15 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                     <Sparkles className="w-3.5 h-3.5 animate-spin" />
                     <span>Scoring…</span>
                   </div>
-                ) : formData.scoresSource === 'unscored' ? (
-                  aiEnabled ? (
-                    formData.aiError ? (
-                      <button
-                        type="button"
-                        onClick={handleReScoreWithAi}
-                        className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
-                        title={formData.aiError}
-                      >
-                        Not scored · Retry
-                      </button>
-                    ) : (
-                      <div className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold">
-                        Scoring…
-                      </div>
-                    )
-                  ) : (
-                    <div className="text-xs text-slate-400 italic px-2">AI is off</div>
-                  )
+                ) : aiEnabled && !formData.lastScoredAt ? (
+                  <button
+                    type="button"
+                    onClick={handleReScoreWithAi}
+                    className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900 text-xs font-bold border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Score with AI
+                  </button>
                 ) : (
                   <div className="flex items-center gap-2">
                     {aiEnabled && (
@@ -1519,19 +1509,25 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                     formData.nextSteps.length > 0 &&
                     formData.nextSteps.every((s) => s.done) && (
                       <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={handleSuggestNextSteps}
-                          disabled={isSuggestingSteps}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          <Sparkles className={`w-3.5 h-3.5 ${isSuggestingSteps ? 'animate-spin' : ''}`} />
-                          <span>
-                            {isSuggestingSteps
-                              ? 'Suggesting new steps...'
-                              : 'All steps completed! Suggest next steps with AI'}
-                          </span>
-                        </button>
+                        {aiEnabled ? (
+                          <button
+                            type="button"
+                            onClick={handleSuggestNextSteps}
+                            disabled={isSuggestingSteps}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <Sparkles className={`w-3.5 h-3.5 ${isSuggestingSteps ? 'animate-spin' : ''}`} />
+                            <span>
+                              {isSuggestingSteps
+                                ? 'Suggesting new steps...'
+                                : 'All steps completed! Suggest next steps with AI'}
+                            </span>
+                          </button>
+                        ) : (
+                          <p className="text-xs text-slate-500 italic text-center py-2">
+                            AI is off — turn it on in Settings
+                          </p>
+                        )}
                       </div>
                     )}
                 </div>
@@ -1546,15 +1542,21 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                       Re-evaluates this idea against current goals, notes, and profile.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleReScoreWithAi}
-                    disabled={isAiScoring}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${isAiScoring ? 'animate-spin' : ''}`} />
-                    <span>{isAiScoring ? 'Scoring...' : 'Re-score with AI'}</span>
-                  </button>
+                  {aiEnabled ? (
+                    <button
+                      type="button"
+                      onClick={handleReScoreWithAi}
+                      disabled={isAiScoring}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isAiScoring ? 'animate-spin' : ''}`} />
+                      <span>{isAiScoring ? 'Scoring...' : 'Re-score with AI'}</span>
+                    </button>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">
+                      AI is off — turn it on in Settings
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -1576,41 +1578,15 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                     <strong>Clarifying Questions:</strong> When an idea is vague or uncertain, the AI raises up to 3 targeted questions. Answering them refines the confidence score and triggers an automatic re-score.
                   </div>
 
-                  {/* Answered Questions */}
-                  {answeredList.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>Answered ({answeredList.length})</span>
-                      </h4>
-                      <div className="space-y-3">
-                        {answeredList.map((qa, idx) => (
-                          <div
-                            key={`answered-${idx}`}
-                            className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                <HelpCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                <span>{qa.question}</span>
-                              </p>
-                              <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
-                                Answered
-                              </span>
-                            </div>
-                            <div className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-800 leading-relaxed">
-                              <span className="font-semibold text-slate-500 dark:text-slate-400 mr-1.5">
-                                Your answer:
-                              </span>
-                              {qa.answer}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  {/* All clear banner when answered > 0 and pending === 0 */}
+                  {answeredList.length > 0 && pendingQuestions.length === 0 && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>All clear: no open questions.</span>
                     </div>
                   )}
 
-                  {/* Pending Questions */}
+                  {/* Pending Questions (Open questions first) */}
                   {pendingQuestions.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1648,7 +1624,7 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                         })}
                       </div>
 
-                      {/* Single Submit answers & Re-score button at the bottom */}
+                      {/* Submit answers & Re-score button */}
                       <div className="pt-2 flex justify-end">
                         <button
                           type="button"
@@ -1659,6 +1635,47 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                           <Sparkles className={`w-3.5 h-3.5 ${isAiScoring ? 'animate-spin' : ''}`} />
                           <span>{aiEnabled ? (isAiScoring ? 'Re-scoring with answers…' : 'Submit answers & Re-score') : 'AI is off — turn it on in Settings'}</span>
                         </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Answered Questions (editable in draft) */}
+                  {answeredList.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>Answered ({answeredList.length})</span>
+                      </h4>
+                      <div className="space-y-3">
+                        {answeredList.map((qa, idx) => (
+                          <div
+                            key={`answered-${idx}`}
+                            className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <HelpCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span>{qa.question}</span>
+                              </p>
+                              <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                                Answered
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              value={qa.answer}
+                              onChange={(e) => {
+                                const newAns = e.target.value;
+                                const updated = answeredList.map((item, i) =>
+                                  i === idx ? { ...item, answer: newAns } : item
+                                );
+                                setFormData({ ...formData, followUpAnswers: updated });
+                              }}
+                              className="w-full px-3.5 py-2.5 min-h-[44px] text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Edit your answer..."
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

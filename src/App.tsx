@@ -285,6 +285,11 @@ export default function App() {
         const primaryNextAction =
           mergedNextSteps.find((s) => !s.done)?.text || data.nextAction || found.nextAction || '';
 
+        const existingAnsweredSet = new Set((found.followUpAnswers || []).map((a) => a.question.toLowerCase().replace(/[^\w\s]/g, '').trim()));
+        const filteredQuestions = (data.followUpQuestions || []).filter(
+          (q) => !existingAnsweredSet.has(q.toLowerCase().replace(/[^\w\s]/g, '').trim())
+        );
+
         const updatedIdea: Idea = {
           ...found,
           fieldTag: (found.fieldTag === 'Other' && data.fieldTag ? data.fieldTag : found.fieldTag) as FieldTag,
@@ -298,7 +303,7 @@ export default function App() {
           aiReasoning: data.reasoning,
           nextAction: primaryNextAction,
           nextSteps: mergedNextSteps,
-          followUpQuestions: data.followUpQuestions || [],
+          followUpQuestions: filteredQuestions,
           aiSuggestedScores: {
             impact: data.impact,
             urgency: data.urgency,
@@ -326,7 +331,7 @@ export default function App() {
     [userId, scoringConfig, aiEnabled]
   );
 
-  // Quick Capture Save: saves in 1 click and immediately kicks off AI scoring
+  // Quick Capture Save: saves in 1 click with user scores and no automatic AI call
   const handleQuickCaptureSave = (title: string, description: string) => {
     const newId = `idea-${Date.now()}`;
     const initialExcitement = 3;
@@ -357,19 +362,16 @@ export default function App() {
       followUpAnswers: [],
       notes: [],
       links: [],
-      scoresSource: aiEnabled ? 'unscored' : 'user', // Requirement: When AI is off, new idea gets scoresSource 'user' and shows its formula score straight away.
+      scoresSource: 'user',
       userEditedScores: {},
       lastActivityAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      isAiScoring: aiEnabled, // Requirement: If AI on, it's scoring, if off it's not.
+      isAiScoring: false,
     };
 
     const nextIdeas = [newIdea, ...ideas];
     updateAndPersist(nextIdeas, profile, goals);
-    if (aiEnabled) {
-      triggerAiScoring(newIdea, profile, goals);
-    }
   };
 
   // Re-score single idea from detail modal

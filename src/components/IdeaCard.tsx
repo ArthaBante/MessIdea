@@ -128,26 +128,19 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
                 <Sparkles className="w-3 h-3 animate-spin" />
                 <span>Scoring…</span>
               </div>
-            ) : idea.scoresSource === 'unscored' ? (
-              aiEnabled ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRetryAiScoring(idea);
-                  }}
-                  className={`min-h-[36px] px-2.5 py-1 rounded-full text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer ${
-                    idea.aiError
-                      ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800'
-                      : 'bg-slate-100 text-slate-700 hover:bg-blue-100 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-blue-900'
-                  }`}
-                  title={idea.aiError ? `AI Error: ${idea.aiError}. Click to retry.` : 'Scoring…'}
-                >
-                  {idea.aiError ? 'Not scored · Retry' : 'Scoring…'}
-                </button>
-              ) : (
-                <div className="text-[10px] text-slate-400 italic px-2">AI is off</div>
-              )
+            ) : aiEnabled && !idea.lastScoredAt ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetryAiScoring(idea);
+                }}
+                className="min-h-[36px] px-2.5 py-1 rounded-full text-xs font-semibold transition-colors flex items-center justify-center cursor-pointer bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900 border border-blue-200 dark:border-blue-800"
+                title="Score this idea with AI"
+              >
+                <Sparkles className="w-3 h-3 mr-1" />
+                Score with AI
+              </button>
             ) : (
               <div className="flex items-center gap-1">
                 {aiEnabled && (
