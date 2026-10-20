@@ -19,11 +19,6 @@ let ai: GoogleGenAI | null = null;
 if (process.env.GEMINI_API_KEY) {
   ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
   });
 }
 
@@ -74,6 +69,39 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
+function formatErrorMessage(error: any): string {
+  if (!error) return 'An unexpected error occurred';
+  const rawMsg = error.message || String(error);
+  try {
+    const parsed = JSON.parse(rawMsg);
+    if (parsed?.error?.message) return parsed.error.message;
+    if (parsed?.message) return parsed.message;
+  } catch {}
+  return rawMsg;
+}
+
+async function generateWithRetry(params: any, retries = 2, delayMs = 1500) {
+  if (!ai) {
+    throw new Error('GEMINI_API_KEY is not configured on the server');
+  }
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (err: any) {
+      const is503 =
+        err?.message?.includes('503') ||
+        err?.status === 503 ||
+        err?.message?.includes('high demand');
+      if (is503 && attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Failed to generate content after retries');
+}
+
 // 1. Idea Scoring endpoint
 app.post('/api/score-idea', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -115,6 +143,7 @@ Rules:
 - Do NOT score excitement; that belongs to the person.
 - If the idea is vague or lacks critical detail, lower confidence and ask at most 3 short, targeted follow-up questions that would most change the scores. NEVER repeat any questions or topics that have already been answered in 'Answers to earlier follow-up questions'. If no further clarification is needed, return an empty list [].
 - nextAction: one concrete step that takes under 2 hours.
+- nextSteps: 3 to 5 short strings, in sequential order, each doable in under 2 hours, based on the idea, notes, follow-up answers, profile and goals.
 - reasoning: 2–4 plain sentences on how the idea serves (or doesn't serve) their goals and the main trade-off. Do not mention numeric scores.
 - Return only JSON matching the schema.`;
 
@@ -167,7 +196,7 @@ skillMatch: fit with current skills (1 mostly new skills, 5 already skilled)
 effort: total work (1 a weekend, 3 a few weeks, 5 many months)
 confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry({
       model: 'gemini-3.8-flash',
       contents: userPrompt,
       config: {
@@ -185,6 +214,7 @@ confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
             'hoursPerWeekNeeded',
             'confidence',
             'nextAction',
+            'nextSteps',
             'followUpQuestions',
             'reasoning',
           ],
@@ -220,6 +250,11 @@ confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
             hoursPerWeekNeeded: { type: Type.NUMBER },
             confidence: { type: Type.INTEGER },
             nextAction: { type: Type.STRING },
+            nextSteps: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: '3 to 5 short actionable steps in order, each under 2 hours',
+            },
             followUpQuestions: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
@@ -264,6 +299,10 @@ confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
       ),
       confidence: Math.min(5, Math.max(1, Math.round(Number(parsed.confidence) || 3))),
       nextAction: parsed.nextAction?.trim() || 'Identify first small experiment',
+      nextSteps:
+        Array.isArray(parsed.nextSteps) && parsed.nextSteps.length > 0
+          ? parsed.nextSteps.slice(0, 5).map((s: any) => String(s).trim()).filter(Boolean)
+          : [parsed.nextAction?.trim() || 'Identify first small experiment'],
       followUpQuestions: Array.isArray(parsed.followUpQuestions)
         ? parsed.followUpQuestions.slice(0, 3)
         : [],
@@ -278,8 +317,116 @@ confidence: how sure you are of these scores (1 guessing, 5 very sure)`;
   } catch (error: any) {
     console.error('Error during AI scoring:', error);
     res.status(500).json({
-      error: error?.message || 'Failed to score idea with AI',
+      error: formatErrorMessage(error),
       code: 'SCORING_FAILED',
+    });
+  }
+});
+
+// Endpoint: Suggest 3 to 5 new next steps when previous steps are completed
+app.post('/api/suggest-next-steps', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { profile, activeGoals, idea, completedSteps } = req.body;
+
+    if (!idea || !idea.title) {
+      res.status(400).json({ error: 'Idea with title is required' });
+      return;
+    }
+
+    if (!ai) {
+      res.status(503).json({
+        error: 'GEMINI_API_KEY is not configured on the server.',
+        code: 'MISSING_API_KEY',
+      });
+      return;
+    }
+
+    const userId = profile?.uid || idea?.userId || 'anonymous';
+    const rateCheck = checkAndIncrementRateLimit(userId);
+    if (!rateCheck.allowed) {
+      res.status(429).json({
+        error: 'Daily AI limit reached (50 calls per day). Please try again tomorrow.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      });
+      return;
+    }
+
+    const systemInstruction = `You are an execution coach for MessIdea.
+The user has completed previous action steps for their idea.
+Suggest 3 to 5 NEW concrete next steps, in sequential order, each doable in under 2 hours.
+Rules:
+- Each step must be concise, practical, and take under 2 hours.
+- Build upon the completed steps, existing notes, and answers.
+- Return only JSON: { "nextSteps": string[] } (3 to 5 items).`;
+
+    const completedText =
+      Array.isArray(completedSteps) && completedSteps.length > 0
+        ? completedSteps.map((s: any) => `✓ ${s}`).join('\n')
+        : 'All initial steps completed';
+
+    const recentNotes =
+      Array.isArray(idea.notes) && idea.notes.length > 0
+        ? idea.notes.slice(-5).map((n: any) => `* ${n.text}`).join('\n')
+        : 'None';
+
+    const answersText =
+      Array.isArray(idea.followUpAnswers) && idea.followUpAnswers.length > 0
+        ? idea.followUpAnswers.map((qa: any) => `Q: ${qa.question}\nA: ${qa.answer}`).join('\n')
+        : 'None';
+
+    const goalsText =
+      Array.isArray(activeGoals) && activeGoals.length > 0
+        ? activeGoals.map((g: any) => `- ${g.title}`).join('\n')
+        : 'None';
+
+    const prompt = `IDEA: ${idea.title}
+DESCRIPTION: ${idea.description || 'None'}
+ACTIVE GOALS:
+${goalsText}
+COMPLETED STEPS:
+${completedText}
+RECENT NOTES:
+${recentNotes}
+ANSWERS TO CLARIFYING QUESTIONS:
+${answersText}
+HOURS PER WEEK AVAILABLE: ${profile?.hoursPerWeek ?? 10}`;
+
+    const response = await generateWithRetry({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          required: ['nextSteps'],
+          properties: {
+            nextSteps: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    const steps = Array.isArray(parsed.nextSteps)
+      ? parsed.nextSteps.map((s: any) => String(s).trim()).filter(Boolean).slice(0, 5)
+      : [];
+
+    res.json({
+      success: true,
+      data: {
+        nextSteps: steps.length > 0 ? steps : ['Plan the next phase of development'],
+      },
+      remainingDailyCalls: rateCheck.remaining,
+    });
+  } catch (err: any) {
+    console.error('Error in suggest-next-steps:', err);
+    res.status(500).json({
+      error: formatErrorMessage(err),
+      code: 'SUGGEST_STEPS_FAILED',
     });
   }
 });
@@ -349,7 +496,7 @@ TOP IDEAS IN NEXT: ${nextSummary}
 STALE IDEAS: ${staleSummary}
 RECENT SHIFTS: ${movesSummary}`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry({
       model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
@@ -378,7 +525,7 @@ RECENT SHIFTS: ${movesSummary}`;
   } catch (err: any) {
     console.error('Error in weekly review:', err);
     res.status(500).json({
-      error: err?.message || 'Failed to generate weekly review',
+      error: formatErrorMessage(err),
       code: 'WEEKLY_REVIEW_FAILED',
     });
   }

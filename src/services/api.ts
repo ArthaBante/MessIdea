@@ -10,6 +10,7 @@ export interface ScoreIdeaResponse {
   hoursPerWeekNeeded: number;
   confidence: number;
   nextAction: string;
+  nextSteps: string[];
   followUpQuestions: string[];
   reasoning: string;
 }
@@ -17,6 +18,39 @@ export interface ScoreIdeaResponse {
 export interface WeeklyReviewResponse {
   summary: string;
   focusIdeaId: string;
+}
+
+export async function suggestNextStepsWithAi(
+  profile: UserProfile,
+  activeGoals: Goal[],
+  idea: Idea,
+  completedSteps: string[]
+): Promise<{ success: boolean; data?: { nextSteps: string[] }; error?: string }> {
+  try {
+    const res = await fetch('/api/suggest-next-steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile, activeGoals, idea, completedSteps }),
+    });
+
+    const result = await res.json();
+    if (!res.ok || !result.success) {
+      return {
+        success: false,
+        error: result.error || 'Failed to suggest next steps',
+      };
+    }
+
+    return {
+      success: true,
+      data: result.data,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Network error while contacting AI server',
+    };
+  }
 }
 
 export async function scoreIdeaWithAi(

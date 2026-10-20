@@ -96,6 +96,13 @@ export interface ScoreSet {
   goalFits?: Record<string, number>; // goalId -> fit override
 }
 
+export interface NextStep {
+  id: string;
+  text: string;
+  done: boolean;
+  userEdited?: boolean;
+}
+
 export interface Idea {
   id: string;
   userId: string;
@@ -117,6 +124,7 @@ export interface Idea {
   status: IdeaStatus;
   aiReasoning: string;
   nextAction: string;
+  nextSteps?: NextStep[];
   followUpQuestions: string[];
   followUpAnswers: FollowUpQA[];
   notes: NoteItem[];

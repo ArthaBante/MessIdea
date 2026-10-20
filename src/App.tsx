@@ -5,6 +5,7 @@ import {
   Goal,
   Idea,
   IdeaStatus,
+  NextStep,
   ScoringConfig,
   UserProfile,
 } from './types';
@@ -247,6 +248,32 @@ export default function App() {
           }
         }
 
+        // Requirement: re-scoring replaces only unticked steps the user hasn't edited; ticked and user-written steps stay.
+        const existingSteps = found.nextSteps || [];
+        const preservedSteps = existingSteps.filter((s) => s.done || s.userEdited);
+
+        const rawAiSteps: string[] =
+          Array.isArray(data.nextSteps) && data.nextSteps.length > 0
+            ? data.nextSteps
+            : data.nextAction
+            ? [data.nextAction]
+            : [];
+
+        const newAiSteps: NextStep[] = rawAiSteps.map((stepText, idx) => ({
+          id: `step-${Date.now()}-${idx}`,
+          text: stepText,
+          done: false,
+          userEdited: false,
+        }));
+
+        const mergedNextSteps: NextStep[] =
+          preservedSteps.length > 0
+            ? [...preservedSteps, ...newAiSteps]
+            : newAiSteps;
+
+        const primaryNextAction =
+          mergedNextSteps.find((s) => !s.done)?.text || data.nextAction || found.nextAction || '';
+
         const updatedIdea: Idea = {
           ...found,
           fieldTag: (found.fieldTag === 'Other' && data.fieldTag ? data.fieldTag : found.fieldTag) as FieldTag,
@@ -258,7 +285,8 @@ export default function App() {
           confidence: mergedConfidence,
           hoursPerWeekNeeded: mergedHours,
           aiReasoning: data.reasoning,
-          nextAction: found.nextAction || data.nextAction,
+          nextAction: primaryNextAction,
+          nextSteps: mergedNextSteps,
           followUpQuestions: data.followUpQuestions || [],
           aiSuggestedScores: {
             impact: data.impact,
@@ -313,6 +341,7 @@ export default function App() {
       status: 'idea',
       aiReasoning: '',
       nextAction: '',
+      nextSteps: [],
       followUpQuestions: [],
       followUpAnswers: [],
       notes: [],
@@ -336,8 +365,17 @@ export default function App() {
   };
 
   // Update an existing idea
+  // Requirement: if the status changed to "paused" or "in_progress", set pinnedBucket to null before re-ranking.
   const handleUpdateIdea = (updatedIdea: Idea) => {
-    const nextIdeas = ideas.map((i) => (i.id === updatedIdea.id ? updatedIdea : i));
+    const existing = ideas.find((i) => i.id === updatedIdea.id);
+    let finalized = updatedIdea;
+    if (
+      (updatedIdea.status === 'paused' || updatedIdea.status === 'in_progress') &&
+      (!existing || existing.status !== updatedIdea.status || updatedIdea.pinnedBucket != null)
+    ) {
+      finalized = { ...updatedIdea, pinnedBucket: null };
+    }
+    const nextIdeas = ideas.map((i) => (i.id === finalized.id ? finalized : i));
     updateAndPersist(nextIdeas, profile, goals);
   };
 
@@ -384,9 +422,19 @@ export default function App() {
   };
 
   // Status change
+  // Requirement: when the new status is "paused" or "in_progress", also set pinnedBucket to null.
   const handleStatusChange = (ideaId: string, status: IdeaStatus) => {
+    const shouldClearPin = status === 'paused' || status === 'in_progress';
     const nextIdeas = ideas.map((i) =>
-      i.id === ideaId ? { ...i, status, lastActivityAt: Date.now(), updatedAt: Date.now() } : i
+      i.id === ideaId
+        ? {
+            ...i,
+            status,
+            pinnedBucket: shouldClearPin ? null : i.pinnedBucket,
+            lastActivityAt: Date.now(),
+            updatedAt: Date.now(),
+          }
+        : i
     );
     updateAndPersist(nextIdeas, profile, goals);
   };

@@ -13,16 +13,25 @@ import {
   Send,
   CheckCircle2,
   AlertCircle,
+  Plus,
+  Edit2,
+  CheckSquare,
+  Square,
+  Eye,
+  EyeOff,
+  ListTodo,
 } from 'lucide-react';
 import {
   FieldTag,
   Goal,
   Idea,
   IdeaStatus,
+  NextStep,
   UserProfile,
 } from '../types';
 import { getFieldTagColor, getScoreBadgeClass, getBucketDetails } from '../utils/colors';
 import { calculateIdeaScore } from '../shared/scoring';
+import { suggestNextStepsWithAi } from '../services/api';
 import { ConfirmModal } from './ConfirmModal';
 
 interface IdeaDetailModalProps {
@@ -56,33 +65,143 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Next steps checklist state
+  const [hideCompletedSteps, setHideCompletedSteps] = useState(false);
+  const [newStepText, setNewStepText] = useState('');
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editingStepText, setEditingStepText] = useState('');
+  const [isSuggestingSteps, setIsSuggestingSteps] = useState(false);
+
   const initialSnapshotRef = useRef<string>('');
   const openedIdeaIdRef = useRef<string | null>(null);
+  const lastScoredAtRef = useRef<number | undefined>(undefined);
 
   // Opening an idea makes a draft copy.
-  // Background updates (AI scoring finishing, re-ranking) must NEVER reset the draft while the idea is open.
-  // Reset the draft ONLY when opening a different idea or upon reopening after close.
+  // Requirement 1: when the open idea's lastScoredAt changes, copy the AI-owned fields from the updated idea into formData and initialSnapshotRef:
+  // aiReasoning, followUpQuestions, aiSuggestedScores, nextSteps, scoresSource, aiError, isAiScoring, priorityScore, scoreBreakdown, and any score or goal fit the user has NOT edited.
+  // Keep the user's unsaved edits and typed answers.
   useEffect(() => {
     if (isOpen && idea) {
       if (openedIdeaIdRef.current !== idea.id) {
         const copy: Idea = JSON.parse(JSON.stringify(idea));
+        if (!copy.nextSteps || copy.nextSteps.length === 0) {
+          copy.nextSteps = copy.nextAction
+            ? [{ id: `step-${copy.id}-0`, text: copy.nextAction, done: false, userEdited: false }]
+            : [];
+        }
         setFormData(copy);
         initialSnapshotRef.current = JSON.stringify(copy);
         openedIdeaIdRef.current = idea.id;
-        setShowBreakdown(false); // Section E: Collapsed every time an idea opens
+        lastScoredAtRef.current = idea.lastScoredAt;
+        setShowBreakdown(false);
+        setHideCompletedSteps(false);
+        setNewStepText('');
+        setEditingStepId(null);
 
         const answersMap: Record<string, string> = {};
         idea.followUpAnswers?.forEach((qa) => {
           answersMap[qa.question] = qa.answer;
         });
         setQuestionAnswers(answersMap);
+      } else if (idea.lastScoredAt !== lastScoredAtRef.current && idea.lastScoredAt != null) {
+        lastScoredAtRef.current = idea.lastScoredAt;
+
+        setFormData((prevDraft) => {
+          if (!prevDraft) return null;
+
+          const userOverrides = prevDraft.userEditedScores || {};
+          const userGoalFits = userOverrides.goalFits || {};
+
+          // Copy scores that user has NOT edited
+          const mergedImpact = userOverrides.impact != null ? prevDraft.impact : idea.impact;
+          const mergedUrgency = userOverrides.urgency != null ? prevDraft.urgency : idea.urgency;
+          const mergedSkillMatch = userOverrides.skillMatch != null ? prevDraft.skillMatch : idea.skillMatch;
+          const mergedEffort = userOverrides.effort != null ? prevDraft.effort : idea.effort;
+          const mergedConfidence = userOverrides.confidence != null ? prevDraft.confidence : idea.confidence;
+          const mergedHours = userOverrides.hoursPerWeekNeeded != null ? prevDraft.hoursPerWeekNeeded : idea.hoursPerWeekNeeded;
+          const mergedFieldTag = userOverrides.fieldTag != null ? prevDraft.fieldTag : idea.fieldTag;
+
+          // Goal fits: preserve user-edited goal fits, use incoming idea goal fits for non-edited
+          const mergedGoalLinks = (idea.goalLinks || []).map((gl) => ({
+            ...gl,
+            fit: userGoalFits[gl.goalId] != null ? userGoalFits[gl.goalId] : gl.fit,
+          }));
+
+          const updatedDraft: Idea = {
+            ...prevDraft, // keeps user edits: title, notes, links, excitement, etc.
+            impact: mergedImpact,
+            urgency: mergedUrgency,
+            skillMatch: mergedSkillMatch,
+            effort: mergedEffort,
+            confidence: mergedConfidence,
+            hoursPerWeekNeeded: mergedHours,
+            fieldTag: mergedFieldTag,
+            goalLinks: mergedGoalLinks,
+            aiReasoning: idea.aiReasoning,
+            followUpQuestions: idea.followUpQuestions,
+            aiSuggestedScores: idea.aiSuggestedScores,
+            nextSteps: idea.nextSteps || prevDraft.nextSteps,
+            nextAction: idea.nextAction || prevDraft.nextAction,
+            scoresSource: idea.scoresSource,
+            aiError: idea.aiError,
+            isAiScoring: idea.isAiScoring,
+            priorityScore: idea.priorityScore,
+            scoreBreakdown: idea.scoreBreakdown,
+            lastScoredAt: idea.lastScoredAt,
+          };
+
+          try {
+            const baseline = JSON.parse(initialSnapshotRef.current || '{}');
+            const updatedBaseline = {
+              ...baseline,
+              impact: mergedImpact,
+              urgency: mergedUrgency,
+              skillMatch: mergedSkillMatch,
+              effort: mergedEffort,
+              confidence: mergedConfidence,
+              hoursPerWeekNeeded: mergedHours,
+              fieldTag: mergedFieldTag,
+              goalLinks: mergedGoalLinks,
+              aiReasoning: idea.aiReasoning,
+              followUpQuestions: idea.followUpQuestions,
+              aiSuggestedScores: idea.aiSuggestedScores,
+              nextSteps: idea.nextSteps || baseline.nextSteps,
+              nextAction: idea.nextAction || baseline.nextAction,
+              scoresSource: idea.scoresSource,
+              aiError: idea.aiError,
+              isAiScoring: idea.isAiScoring,
+              priorityScore: idea.priorityScore,
+              scoreBreakdown: idea.scoreBreakdown,
+              lastScoredAt: idea.lastScoredAt,
+            };
+            initialSnapshotRef.current = JSON.stringify(updatedBaseline);
+          } catch (e) {
+            initialSnapshotRef.current = JSON.stringify(updatedDraft);
+          }
+
+          return updatedDraft;
+        });
+      } else {
+        // Keep live isAiScoring / aiError flags in sync
+        setFormData((prevDraft) => {
+          if (!prevDraft) return null;
+          if (prevDraft.isAiScoring !== idea.isAiScoring || prevDraft.aiError !== idea.aiError) {
+            return {
+              ...prevDraft,
+              isAiScoring: idea.isAiScoring,
+              aiError: idea.aiError,
+            };
+          }
+          return prevDraft;
+        });
       }
     } else if (!isOpen) {
       openedIdeaIdRef.current = null;
+      lastScoredAtRef.current = undefined;
       setFormData(null);
       setShowDeleteConfirm(false);
     }
-  }, [isOpen, idea?.id]);
+  }, [isOpen, idea]);
 
   // Compute if draft is dirty
   const isDirty = useMemo(() => {
@@ -252,6 +371,131 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
       ...formData,
       links: (formData.links || []).filter((l) => l !== urlToRemove),
     });
+  };
+
+  // Next steps checklist handlers (updates local draft; saved on Save)
+  const handleToggleStep = (stepId: string) => {
+    if (!formData) return;
+    const existingSteps = formData.nextSteps || [];
+    const target = existingSteps.find((s) => s.id === stepId);
+    if (!target) return;
+
+    const willBeDone = !target.done;
+    const newSteps = existingSteps.map((s) =>
+      s.id === stepId ? { ...s, done: willBeDone } : s
+    );
+
+    // A ticked step is added to the Activity Log as done and counts as activity
+    let updatedNotes = formData.notes || [];
+    if (willBeDone) {
+      const noteItem = {
+        id: `note-${Date.now()}`,
+        text: `Completed step: ${target.text}`,
+        createdAt: Date.now(),
+      };
+      updatedNotes = [...updatedNotes, noteItem];
+    }
+
+    const firstUnticked = newSteps.find((s) => !s.done);
+    setFormData({
+      ...formData,
+      nextSteps: newSteps,
+      nextAction: firstUnticked?.text || '',
+      notes: updatedNotes,
+      lastActivityAt: Date.now(),
+    });
+  };
+
+  const handleSaveEditStep = (stepId: string) => {
+    if (!formData || !editingStepText.trim()) {
+      setEditingStepId(null);
+      return;
+    }
+    const newSteps = (formData.nextSteps || []).map((s) =>
+      s.id === stepId ? { ...s, text: editingStepText.trim(), userEdited: true } : s
+    );
+    const firstUnticked = newSteps.find((s) => !s.done);
+    setFormData({
+      ...formData,
+      nextSteps: newSteps,
+      nextAction: firstUnticked?.text || '',
+    });
+    setEditingStepId(null);
+  };
+
+  const handleDeleteStep = (stepId: string) => {
+    if (!formData) return;
+    const newSteps = (formData.nextSteps || []).filter((s) => s.id !== stepId);
+    const firstUnticked = newSteps.find((s) => !s.done);
+    setFormData({
+      ...formData,
+      nextSteps: newSteps,
+      nextAction: firstUnticked?.text || '',
+    });
+  };
+
+  const handleAddCustomStep = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData || !newStepText.trim()) return;
+    const newStep: NextStep = {
+      id: `step-${Date.now()}`,
+      text: newStepText.trim(),
+      done: false,
+      userEdited: true,
+    };
+    const newSteps = [...(formData.nextSteps || []), newStep];
+    const firstUnticked = newSteps.find((s) => !s.done);
+    setFormData({
+      ...formData,
+      nextSteps: newSteps,
+      nextAction: firstUnticked?.text || '',
+    });
+    setNewStepText('');
+  };
+
+  const handleSuggestNextSteps = async () => {
+    if (!formData) return;
+    // Saves the draft first
+    const toSave: Idea = {
+      ...formData,
+      priorityScore: previewScore,
+      scoreBreakdown: previewBreakdown || formData.scoreBreakdown,
+      lastActivityAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    onUpdateIdea(toSave);
+    initialSnapshotRef.current = JSON.stringify(toSave);
+    setFormData(toSave);
+
+    setIsSuggestingSteps(true);
+    try {
+      const activeGoals = goals.filter((g) => g.status === 'active');
+      const completedList = (toSave.nextSteps || []).filter((s) => s.done).map((s) => s.text);
+      const res = await suggestNextStepsWithAi(profile, activeGoals, toSave, completedList);
+      if (res.success && res.data?.nextSteps) {
+        const freshSteps: NextStep[] = res.data.nextSteps.map((txt, idx) => ({
+          id: `step-${Date.now()}-${idx}`,
+          text: txt,
+          done: false,
+          userEdited: false,
+        }));
+        const mergedSteps = [...(toSave.nextSteps || []), ...freshSteps];
+        const updatedIdea: Idea = {
+          ...toSave,
+          nextSteps: mergedSteps,
+          nextAction: freshSteps[0]?.text || '',
+          lastActivityAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        onUpdateIdea(updatedIdea);
+        setFormData(updatedIdea);
+        initialSnapshotRef.current = JSON.stringify(updatedIdea);
+      }
+    } catch (e) {
+      console.error('Error suggesting next steps:', e);
+    } finally {
+      setIsSuggestingSteps(false);
+    }
   };
 
   // "Re-score with AI" and "Submit & Re-score" save the draft first, then call the AI
@@ -1092,44 +1336,185 @@ export const IdeaDetailModal: React.FC<IdeaDetailModalProps> = ({
                   </p>
                 </div>
 
-                {/* Concrete Next Action */}
-                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 uppercase tracking-wider">
-                      <ArrowRight className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      Concrete Next Action (&lt;2 hours)
-                    </h4>
-                    {formData.nextAction && (
+                {/* Next Steps Checklist */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 uppercase tracking-wider">
+                        <ListTodo className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        Next Steps
+                      </h4>
+                      {formData.nextSteps && formData.nextSteps.length > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
+                          {formData.nextSteps.filter((s) => s.done).length}/{formData.nextSteps.length} done
+                        </span>
+                      )}
+                    </div>
+                    {formData.nextSteps && formData.nextSteps.some((s) => s.done) && (
                       <button
                         type="button"
-                        onClick={() => {
-                          const note = {
-                            id: `note-${Date.now()}`,
-                            text: `Completed next action: ${formData.nextAction}`,
-                            createdAt: Date.now(),
-                          };
-                          setFormData({
-                            ...formData,
-                            notes: [...(formData.notes || []), note],
-                            nextAction: '',
-                          });
-                        }}
-                        className="min-h-[44px] px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 cursor-pointer"
+                        onClick={() => setHideCompletedSteps(!hideCompletedSteps)}
+                        className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1 cursor-pointer"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        Mark Step Complete
+                        {hideCompletedSteps ? (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            Show completed
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            Hide completed
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    value={formData.nextAction || ''}
-                    onChange={(e) => {
-                      setFormData({ ...formData, nextAction: e.target.value });
-                    }}
-                    placeholder="Specific first step taking under 2 hours..."
-                    className="w-full px-3.5 py-2.5 min-h-[44px] text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Concrete, sequential steps taking under 2 hours each. Check off as you make progress.
+                  </p>
+
+                  {/* Steps List */}
+                  <div className="space-y-2">
+                    {(!formData.nextSteps || formData.nextSteps.length === 0) && (
+                      <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">
+                        No steps added yet. Add a step below or click &quot;Suggest next steps with AI&quot;.
+                      </p>
+                    )}
+
+                    {formData.nextSteps
+                      ?.filter((s) => (hideCompletedSteps ? !s.done : true))
+                      .map((step) => {
+                        const isEditing = editingStepId === step.id;
+                        return (
+                          <div
+                            key={step.id}
+                            className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors ${
+                              step.done
+                                ? 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                                : 'bg-slate-50/70 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200'
+                            }`}
+                          >
+                            {/* Tick checkbox */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStep(step.id)}
+                              className="mt-0.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors shrink-0 cursor-pointer"
+                              title={step.done ? 'Mark step as incomplete' : 'Mark step as completed'}
+                            >
+                              {step.done ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400 hover:text-blue-600" />
+                              )}
+                            </button>
+
+                            {/* Step Text or Inline Edit */}
+                            {isEditing ? (
+                              <div className="flex-1 flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={editingStepText}
+                                  onChange={(e) => setEditingStepText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveEditStep(step.id);
+                                    if (e.key === 'Escape') setEditingStepId(null);
+                                  }}
+                                  autoFocus
+                                  className="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-blue-500 rounded-lg text-slate-900 dark:text-white focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditStep(step.id)}
+                                  className="px-2 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingStepId(null)}
+                                  className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                                <span
+                                  className={`text-xs leading-relaxed break-words ${
+                                    step.done ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                                  }`}
+                                >
+                                  {step.text}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingStepId(step.id);
+                                      setEditingStepText(step.text);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
+                                    title="Edit step"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteStep(step.id)}
+                                    className="p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
+                                    title="Delete step"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Add new custom step */}
+                  <form onSubmit={handleAddCustomStep} className="flex gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newStepText}
+                      onChange={(e) => setNewStepText(e.target.value)}
+                      placeholder="Add a custom next step (< 2 hours)..."
+                      className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newStepText.trim()}
+                      className="px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40 text-slate-700 dark:text-slate-200 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add
+                    </button>
+                  </form>
+
+                  {/* If all steps are ticked (or list is empty), show button "Suggest next steps with AI" */}
+                  {formData.nextSteps &&
+                    formData.nextSteps.length > 0 &&
+                    formData.nextSteps.every((s) => s.done) && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={handleSuggestNextSteps}
+                          disabled={isSuggestingSteps}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <Sparkles className={`w-3.5 h-3.5 ${isSuggestingSteps ? 'animate-spin' : ''}`} />
+                          <span>
+                            {isSuggestingSteps
+                              ? 'Suggesting new steps...'
+                              : 'All steps completed! Suggest next steps with AI'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
                 </div>
 
                 {/* Re-score AI trigger: Saves draft first then triggers AI */}

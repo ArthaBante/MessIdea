@@ -343,13 +343,18 @@ export const IdeaCard: React.FC<IdeaCardProps> = ({
           </div>
         ) : null}
 
-        {/* Concrete Next Action Preview */}
-        {idea.nextAction ? (
-          <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 bg-blue-50/50 dark:bg-blue-950/30 px-2 py-1.5 rounded-md border border-blue-100/60 dark:border-blue-900/40 mb-2.5">
-            <ArrowRight className="w-3 h-3 text-blue-500 shrink-0" />
-            <span className="truncate">{idea.nextAction}</span>
-          </div>
-        ) : null}
+        {/* Next Step Preview: First unticked step */}
+        {(() => {
+          const firstUnticked = (idea.nextSteps || []).find((s) => !s.done);
+          const displayText = firstUnticked?.text || idea.nextAction;
+          if (!displayText) return null;
+          return (
+            <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 bg-blue-50/50 dark:bg-blue-950/30 px-2 py-1.5 rounded-md border border-blue-100/60 dark:border-blue-900/40 mb-2.5">
+              <ArrowRight className="w-3 h-3 text-blue-500 shrink-0" />
+              <span className="truncate">{displayText}</span>
+            </div>
+          );
+        })()}
 
         {/* Footer: Excitement, Hours & Links */}
         <div className="flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-700/60">

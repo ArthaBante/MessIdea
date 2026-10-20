@@ -278,7 +278,23 @@ export function loadScoringConfig(): ScoringConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SCORING_CONFIG);
     if (raw) {
-      return { ...DEFAULT_SCORING_CONFIG, ...JSON.parse(raw) };
+      const parsed = { ...DEFAULT_SCORING_CONFIG, ...JSON.parse(raw) };
+      const total =
+        (parsed.goalFitWeight || 0) +
+        (parsed.impactWeight || 0) +
+        (parsed.urgencyWeight || 0) +
+        (parsed.skillMatchWeight || 0) +
+        (parsed.excitementWeight || 0);
+
+      // In loadScoringConfig: if saved weights don't add up to 100%, rescale them so they do.
+      if (Math.abs(total - 1.0) > 0.001 && total > 0) {
+        parsed.goalFitWeight = parsed.goalFitWeight / total;
+        parsed.impactWeight = parsed.impactWeight / total;
+        parsed.urgencyWeight = parsed.urgencyWeight / total;
+        parsed.skillMatchWeight = parsed.skillMatchWeight / total;
+        parsed.excitementWeight = parsed.excitementWeight / total;
+      }
+      return parsed;
     }
   } catch (e) {
     console.error('Error loading custom scoring config:', e);
@@ -341,8 +357,14 @@ export function replaceWithSampleData(uid: string): UserDataStore {
   const store: UserDataStore = {
     profile: { ...INITIAL_DEMO_PROFILE, uid, updatedAt: Date.now() },
     goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: uid })),
-    ideas: rankedIdeas.map((i) => ({ ...i, userId: uid, isAiScoring: false, pinnedBucket: null })),
-    version: 2,
+    ideas: rankedIdeas.map((i) => ({
+      ...i,
+      userId: uid,
+      isAiScoring: false,
+      pinnedBucket: null,
+      nextSteps: i.nextSteps || (i.nextAction ? [{ id: `step-${i.id}-0`, text: i.nextAction, done: false, userEdited: false }] : []),
+    })),
+    version: 3,
   };
   saveUserData(uid, store);
   return store;
@@ -360,8 +382,14 @@ export function loadUserData(uid: string): UserDataStore {
       const store: UserDataStore = {
         profile: { ...INITIAL_DEMO_PROFILE, uid },
         goals: INITIAL_DEMO_GOALS.map((g) => ({ ...g, userId: uid })),
-        ideas: rankedIdeas.map((i) => ({ ...i, userId: uid, isAiScoring: false, pinnedBucket: null })),
-        version: 2,
+        ideas: rankedIdeas.map((i) => ({
+          ...i,
+          userId: uid,
+          isAiScoring: false,
+          pinnedBucket: null,
+          nextSteps: i.nextSteps || (i.nextAction ? [{ id: `step-${i.id}-0`, text: i.nextAction, done: false, userEdited: false }] : []),
+        })),
+        version: 3,
       };
       saveUserData(uid, store);
       return store;
@@ -384,7 +412,7 @@ export function loadUserData(uid: string): UserDataStore {
         profile: newProfile,
         goals: [],
         ideas: [],
-        version: 2,
+        version: 3,
       };
       saveUserData(uid, store);
       return store;
@@ -401,20 +429,43 @@ export function loadUserData(uid: string): UserDataStore {
       isAiScoring: false,
     }));
 
-    // 2. One-time clean-up on load: set pinnedBucket to null on all existing ideas, recorded via version 2
-    const needsPinCleanup = !parsed.version || parsed.version < 2;
-    if (needsPinCleanup) {
-      ideas = ideas.map((idea) => ({
-        ...idea,
-        pinnedBucket: null,
-      }));
-      parsed.version = 2;
+    // Move any existing nextAction into the first step so nothing is lost
+    ideas = ideas.map((idea) => {
+      if (!idea.nextSteps || idea.nextSteps.length === 0) {
+        if (idea.nextAction && idea.nextAction.trim()) {
+          return {
+            ...idea,
+            nextSteps: [
+              {
+                id: `step-${idea.id}-0`,
+                text: idea.nextAction.trim(),
+                done: false,
+                userEdited: false,
+              },
+            ],
+          };
+        }
+        return { ...idea, nextSteps: [] };
+      }
+      return idea;
+    });
+
+    // 2. One-time clean-up for data with version below 3: set pinnedBucket to null on every idea whose status is "paused" or "in_progress", then save as version 3.
+    const needsV3Cleanup = !parsed.version || parsed.version < 3;
+    if (needsV3Cleanup) {
+      ideas = ideas.map((idea) => {
+        if (idea.status === 'paused' || idea.status === 'in_progress') {
+          return { ...idea, pinnedBucket: null };
+        }
+        return idea;
+      });
+      parsed.version = 3;
     }
 
     // Ensure all ideas have updated ranks & breakdown
     parsed.ideas = rankAllIdeas(ideas, parsed.profile, parsed.goals, config);
 
-    if (needsPinCleanup) {
+    if (needsV3Cleanup) {
       saveUserData(uid, parsed);
     }
 
@@ -425,7 +476,7 @@ export function loadUserData(uid: string): UserDataStore {
       profile: { ...INITIAL_DEMO_PROFILE, uid },
       goals: [],
       ideas: [],
-      version: 2,
+      version: 3,
     };
   }
 }
@@ -442,7 +493,7 @@ export function saveUserData(uid: string, data: UserDataStore): void {
   const payload: UserDataStore = {
     ...data,
     ideas: cleanIdeas,
-    version: data.version ?? 2,
+    version: data.version ?? 3,
   };
 
   localStorage.setItem(key, JSON.stringify(payload));
